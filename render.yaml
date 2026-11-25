@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: secureiot-sim
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: python web_demo.py
+    healthCheckPath: /dashboard
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.10
+      - key: PANEL_PASSWORD
+        sync: false        # Render asks you to type the control-panel password

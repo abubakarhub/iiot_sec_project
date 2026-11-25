@@ -12,13 +12,19 @@ This is the "lab view" of the simulation, NOT part of the building's cloud:
 
 It is kept separate from the cloud API on purpose: the cloud (port 5000) is the
 system under test, and this panel plays the role of the attacker's laptop and
-the lab instructor. It only listens on 127.0.0.1 and only accepts requests from
-this computer.
+the lab instructor. Normally it only listens on 127.0.0.1 and only accepts
+requests from this computer.
+
+Hosted demo (web_demo.py, environment variable SECUREIOT_PUBLIC=1): the panel is
+reachable from the internet, so instead of the "this computer only" rule it asks
+for a password (HTTP Basic auth, password from PANEL_PASSWORD) and the Stop button
+is disabled. The attacks still only target the simulation inside the server.
 """
 
+import hmac
 import os
 
-from flask import Flask, abort, jsonify, render_template, request
+from flask import Flask, Response, abort, jsonify, render_template, request
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 LOCAL_ADDRESSES = {"127.0.0.1", "::1"}
@@ -28,11 +34,19 @@ PANEL_HEADER = "X-Panel-Request"     # custom header -> other websites cannot PO
 def create_control_panel(live):
     """Build the control-panel Flask app for a running LiveSimulation."""
     app = Flask("control_panel", template_folder=os.path.join(HERE, "templates"))
+    public = os.environ.get("SECUREIOT_PUBLIC") == "1"
+    password = os.environ.get("PANEL_PASSWORD", "")
 
     @app.before_request
-    def only_this_computer():
-        """Refuse anything not coming from this laptop; POSTs must carry the panel header."""
-        if request.remote_addr not in LOCAL_ADDRESSES:
+    def guard():
+        """Local mode: this laptop only. Hosted mode: password. POSTs need the panel header."""
+        if public:
+            auth = request.authorization
+            given = (auth.password or "") if auth else ""
+            if not password or not hmac.compare_digest(given.encode(), password.encode()):
+                return Response("Password required for the SecureIoT-Sim control panel.", 401,
+                                {"WWW-Authenticate": 'Basic realm="SecureIoT-Sim control panel"'})
+        elif request.remote_addr not in LOCAL_ADDRESSES:
             abort(403)
         if request.method == "POST" and request.headers.get(PANEL_HEADER) != "1":
             abort(403)
@@ -82,6 +96,8 @@ def create_control_panel(live):
     @app.post("/api/stop")
     def stop():
         """Shut the whole simulation down (main.py notices and stops everything)."""
+        if public:
+            return jsonify({"ok": False, "message": "Stopping is disabled in the hosted demo."}), 403
         live.request_stop()
         return jsonify({"ok": True, "message": "simulation is stopping"})
 

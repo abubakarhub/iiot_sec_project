@@ -110,6 +110,15 @@ Useful options:
 
 Example: `python main.py --mode secure --live`
 
+### Hosted live demo (Render)
+
+`web_demo.py` runs the same live simulation on one public port: `/panel/` is the
+control panel (password-protected; the password comes from the `PANEL_PASSWORD`
+environment variable) and `/dashboard` is the cloud dashboard. Stop is disabled
+there. Inside the server everything still uses `127.0.0.1`, so the attacks only hit
+the simulation. Deploy with `render.yaml`: on render.com choose **New → Blueprint**,
+pick this repository, and type a password when asked.
+
 ## 4. Results (`results/`)
 
 | File | Content |

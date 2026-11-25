@@ -48,11 +48,12 @@ def short_result(result):
 class LiveSimulation:
     """Background traffic, on-demand attacks and mode switching for a running building."""
 
-    def __init__(self, building, interval=config.LIVE_INTERVAL, panel_url=None):
+    def __init__(self, building, interval=config.LIVE_INTERVAL, panel_url=None, dashboard_url=None):
         """Remember the building; nothing runs until start()."""
         self.building = building
         self.interval = interval
         self.panel_url = panel_url              # shown as a button on the cloud dashboard
+        self.dashboard_url = dashboard_url      # hosted demo: "/dashboard" instead of 127.0.0.1:5000
         self.running = False
         self.paused = False                     # True = devices stop sending (Pause button)
         self.stop_requested = threading.Event() # set by the "Stop simulation" button
@@ -301,7 +302,7 @@ class LiveSimulation:
             "interval": self.interval,
             "paused": self.paused,
             "busy": self.busy,
-            "dashboard_url": f"{building.api_url}/dashboard",
+            "dashboard_url": self.dashboard_url or f"{building.api_url}/dashboard",
             "cloud_received": building.bridge.received,
             "broker": totals,
             "feed": list(reversed(feed)),

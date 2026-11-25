@@ -307,7 +307,7 @@
           if ((action === "revoke" || action === "rotate") && d.status !== "active") b.disabled = true;
           if (action === "restore" && d.status === "active" && d.online) b.disabled = true;
           if (busy) b.disabled = true;
-          b.addEventListener("click", () => post("/api/device/" + d.device_id + "/" + action));
+          b.addEventListener("click", () => post("api/device/" + d.device_id + "/" + action));
           actions.append(b);
         }
         card.append(actions);
@@ -337,7 +337,7 @@
         info.append(l);
       }
       const b = el("button", "Run", ""); b.type = "button"; b.disabled = busy;
-      b.addEventListener("click", () => post("/api/attack/" + a.name));
+      b.addEventListener("click", () => post("api/attack/" + a.name));
       line.append(info, b); box.append(line);
     }
     $("run-all").disabled = busy;
@@ -426,7 +426,7 @@
   async function refresh() {
     if (stopped) return;
     try {
-      const res = await fetch("/api/state");
+      const res = await fetch("api/state");
       if (!res.ok) throw new Error("HTTP " + res.status);
       render(await res.json());
       $("live-dot").classList.toggle("off", paused);
@@ -444,15 +444,20 @@
     for (const b of document.querySelectorAll("button")) if (b.id !== "theme") b.disabled = true;
   }
 
-  $("run-all").addEventListener("click", () => post("/api/attack/all"));
-  $("compare").addEventListener("click", () => post("/api/compare"));
-  $("to-insecure").addEventListener("click", () => post("/api/mode/insecure"));
-  $("to-secure").addEventListener("click", () => post("/api/mode/secure"));
-  $("pause").addEventListener("click", () => post("/api/traffic/" + (paused ? "resume" : "pause")));
+  $("run-all").addEventListener("click", () => post("api/attack/all"));
+  $("compare").addEventListener("click", () => post("api/compare"));
+  $("to-insecure").addEventListener("click", () => post("api/mode/insecure"));
+  $("to-secure").addEventListener("click", () => post("api/mode/secure"));
+  $("pause").addEventListener("click", () => post("api/traffic/" + (paused ? "resume" : "pause")));
   $("stop").addEventListener("click", async () => {
     if (!confirm("Stop the whole simulation? The broker, cloud, dashboard and devices will shut down.")) return;
     try {
-      await fetch("/api/stop", { method: "POST", headers: { "X-Panel-Request": "1" } });
+      const res = await fetch("api/stop", { method: "POST", headers: { "X-Panel-Request": "1" } });
+      if (!res.ok) {                          // e.g. the hosted demo does not allow stopping
+        const body = await res.json().catch(() => ({}));
+        $("toast").textContent = body.message || ("HTTP " + res.status);
+        return;
+      }
     } catch (e) { /* already stopping */ }
     showStopped();
   });
