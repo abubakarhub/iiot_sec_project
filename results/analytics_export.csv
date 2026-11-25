@@ -1,0 +1,9 @@
+device,device_type,metric,readings,average
+anon-cd43b20be8,energy,power_w,10,1541.98
+anon-ad04a1ef07,energy,power_w,25,80440.83
+anon-1625298e5b,door_lock,unlock_count,13,0.23
+anon-e48f346a25,door_lock,unlock_count,6,0.0
+anon-a532ac15fb,motion,occupancy,10,1.9
+anon-3472dfcb28,motion,occupancy,5,3.6
+anon-973db5fcf0,temperature,temperature_c,10,22.22
+anon-cd8bfe8b1c,temperature,temperature_c,15,20.93

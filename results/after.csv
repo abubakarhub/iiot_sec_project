@@ -1,0 +1,9 @@
+attack,mode,attempts,successes,success_rate_pct,outcome,observed_defence,evidence,timestamp
+sniffing,secure,20,0,0.0,BLOCKED,payload unreadable on the wire (encrypted),"captured 20 frames; none readable. sample: {""payload"":{""ct"":""megUoaeJulNyZLok/gJankshJr5rOGo6QZzr1vyL/THeYj37ihTHubUHFJHkh4yIXj1aDGAZ...",2026-11-22 16:09:55
+tampering,secure,10,0,0.0,BLOCKED,HMAC check failed (message modified),"relay modified 10 frames; cloud stored 0 temp-01 readings, 0 of them = 85.0 C",2026-11-22 16:09:56
+replay,secure,5,0,0.0,BLOCKED,replayed message (old sequence number),replayed captured unlock frame 5x; door unlocked 0x; lock rejected 0 commands in total,2026-11-22 16:10:00
+spoofing,secure,10,0,0.0,BLOCKED,challenge-response failed (wrong key); not authenticated,"hello as temp-01 REFUSED; sent 10 fake readings, cloud stored 0",2026-11-22 16:10:01
+brute_force,secure,99,0,0.0,BLOCKED,"login refused: HTTP 401 x5, HTTP 423 x5, HTTP 429 x89","99 guesses, no token (HTTP 401 x5, HTTP 423 x5, HTTP 429 x89)",2026-11-22 16:10:05
+flooding_broker,secure,1000,20,2.0,PARTIAL,rate limit exceeded,"1000 msgs sent in 0.21s, cloud stored 20; honest temp-02: 10/10 readings arrived",2026-11-22 16:10:06
+flooding_api,secure,300,36,12.0,PARTIAL,refused: HTTP 429 x264,"300 requests in 3.30s: HTTP 200 x36, HTTP 429 x264",2026-11-22 16:10:10
+unauthorised_command,secure,4,0,0.0,BLOCKED,viewer token -> HTTP 403; no token -> HTTP 401; forged admin JWT -> HTTP 401; direct broker publish -> hello refused; broker: unknown or revoked device 'viewer1-laptop'; not authenticated,viewer token: refused (HTTP 403); no token: refused (HTTP 401); forged admin JWT: refused (HTTP 401); direct broker publish: refused (hello refused),2026-11-22 16:10:12

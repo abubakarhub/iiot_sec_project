@@ -1,0 +1,9 @@
+attack,mode,attempts,successes,success_rate_pct,outcome,observed_defence,evidence,timestamp
+sniffing,insecure,20,20,100.0,SUCCEEDED,none - attack was not stopped,"captured 20 frames; readable example: {'power_w': 2360.5, 'total_kwh': 1946.257}",2026-11-22 16:09:32
+tampering,insecure,10,10,100.0,SUCCEEDED,none - attack was not stopped,"relay modified 10 frames; cloud stored 10 temp-01 readings, 10 of them = 85.0 C",2026-11-22 16:09:34
+replay,insecure,5,5,100.0,SUCCEEDED,none - attack was not stopped,replayed captured unlock frame 5x; door unlocked 5x; lock rejected 0 commands in total,2026-11-22 16:09:38
+spoofing,insecure,10,10,100.0,SUCCEEDED,none - attack was not stopped,"hello as temp-01 ACCEPTED; sent 10 fake readings, cloud stored 10",2026-11-22 16:09:39
+brute_force,insecure,59,1,100.0,SUCCEEDED,none - attack was not stopped,"token obtained for operator1 after 59 guesses (HTTP 200 x1, HTTP 401 x58)",2026-11-22 16:09:40
+flooding_broker,insecure,1000,1000,100.0,SUCCEEDED,none - attack was not stopped,"1000 msgs sent in 0.21s, cloud stored 1000; honest temp-02: 10/10 readings arrived",2026-11-22 16:09:49
+flooding_api,insecure,300,300,100.0,SUCCEEDED,none - attack was not stopped,300 requests in 0.47s: HTTP 200 x300,2026-11-22 16:09:49
+unauthorised_command,insecure,4,4,100.0,SUCCEEDED,none - attack was not stopped,viewer token: UNLOCKED (HTTP 200); no token: UNLOCKED (HTTP 200); forged admin JWT: UNLOCKED (HTTP 200); direct broker publish: UNLOCKED (hello accepted),2026-11-22 16:09:51

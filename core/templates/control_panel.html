@@ -1,0 +1,464 @@
+<!doctype html>
+<!--
+  core/templates/control_panel.html - Live simulation control panel.
+
+  Polls GET /api/state once a second and redraws:
+    devices (live readings), gateway traffic feed, attack lab + results,
+    before/after table, activity log and (secure mode) alerts.
+  Buttons POST to /api/attack/<name>, /api/mode/<mode>, /api/compare,
+  /api/traffic/<pause|resume>, /api/stop and /api/device/<id>/<action>.
+  All values are inserted with textContent (never innerHTML).
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SecureIoT-Sim Control Panel</title>
+<script>
+  // Apply the saved light/dark choice before the page is drawn (no flash).
+  (function () {
+    var theme = null;
+    try { theme = new URLSearchParams(location.search).get("theme"); } catch (e) {}
+    if (theme !== "dark" && theme !== "light") {
+      try { theme = localStorage.getItem("secureteam-theme"); } catch (e) {}
+    }
+    if (theme === "dark" || theme === "light") document.documentElement.setAttribute("data-theme", theme);
+  })();
+</script>
+<style>
+  :root {
+    --bg: #f9f9f7; --card: #fcfcfb; --ink: #0b0b0b; --ink-2: #52514e; --line: #e4e3df;
+    --soft: #f0efec; --accent: #2a78d6; --good: #0a7d0a; --warn: #9a6700; --bad: #c62f2f;
+    --good-bg: #e6f4e6; --warn-bg: #fbf1dc; --bad-bg: #fbe7e7; --info-bg: #e8f1fc;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #0d0d0d; --card: #1a1a19; --ink: #f0efec; --ink-2: #b8b7ad; --line: #383835;
+      --soft: #232322; --accent: #3987e5; --good: #3fbf3f; --warn: #f0b429; --bad: #ef6b6b;
+      --good-bg: #13301a; --warn-bg: #33280e; --bad-bg: #3a1717; --info-bg: #13243a;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #0d0d0d; --card: #1a1a19; --ink: #f0efec; --ink-2: #b8b7ad; --line: #383835;
+    --soft: #232322; --accent: #3987e5; --good: #3fbf3f; --warn: #f0b429; --bad: #ef6b6b;
+    --good-bg: #13301a; --warn-bg: #33280e; --bad-bg: #3a1717; --info-bg: #13243a;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink);
+         font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  header { display: flex; align-items: center; justify-content: space-between; gap: 12px;
+           padding: 12px 20px; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+  h1 { font-size: 18px; margin: 0; }
+  h2 { font-size: 13px; margin: 0 0 10px; color: var(--ink-2); font-weight: 600;
+       text-transform: uppercase; letter-spacing: .05em; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .head-right { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .badge { display: inline-block; padding: 2px 9px; border-radius: 999px; font-size: 12px;
+           border: 1px solid var(--line); color: var(--ink-2); white-space: nowrap; }
+  .live-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--good); display: inline-block;
+              animation: pulse 1.6s infinite; }
+  .live-dot.off { background: var(--ink-2); animation: none; }
+  @keyframes pulse { 50% { opacity: .25; } }
+  a { color: var(--accent); }
+  button { font: inherit; padding: 6px 12px; border-radius: 6px; border: 1px solid var(--accent);
+           background: var(--accent); color: #fff; cursor: pointer; }
+  button.small { padding: 2px 8px; font-size: 12px; background: transparent; color: var(--accent); }
+  button:disabled { opacity: .45; cursor: not-allowed; }
+  .btn-ghost { background: transparent; color: var(--accent); }
+  .btn-danger { background: transparent; color: var(--bad); border-color: var(--bad); }
+  .btn-danger:hover:not(:disabled) { background: var(--bad); color: #fff; }
+  .btn-link { display: inline-block; padding: 6px 12px; border-radius: 6px; text-decoration: none;
+              border: 1px solid var(--accent); color: var(--accent); font-weight: 600; }
+  .btn-link:hover { background: var(--accent); color: #fff; }
+  /* insecure / secure switch */
+  .seg { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+  .seg button { border: 0; border-radius: 0; background: transparent; color: var(--ink-2); padding: 6px 12px; }
+  .seg button + button { border-left: 1px solid var(--line); }
+  .seg button.on-insecure { background: var(--bad-bg); color: var(--bad); font-weight: 650; }
+  .seg button.on-secure { background: var(--good-bg); color: var(--good); font-weight: 650; }
+  .seg button.on-insecure:disabled, .seg button.on-secure:disabled { opacity: 1; cursor: default; }
+  #busybar, #stopped { display: none; margin: 12px 20px 0; padding: 10px 14px; border-radius: 10px; }
+  #busybar { background: var(--info-bg); border: 1px solid var(--accent); }
+  #stopped { background: var(--bad-bg); border: 1px solid var(--bad); }
+  code { font-family: ui-monospace, Consolas, monospace; }
+  main { padding: 16px 20px 28px; display: grid; gap: 16px;
+         grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); }
+  @media (max-width: 1000px) { main { grid-template-columns: minmax(0, 1fr); } }
+  .full { grid-column: 1 / -1; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 16px; min-width: 0; }
+  .tiles { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); }
+  .tile { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 12px 16px; }
+  .tile .num { font-size: 26px; font-weight: 650; font-variant-numeric: tabular-nums; }
+  .tile .lbl { color: var(--ink-2); font-size: 12px; }
+  .devices { display: grid; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); }
+  .dev { border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; background: var(--soft); }
+  .dev.flash { animation: flash 0.9s ease-out; }
+  @keyframes flash { from { box-shadow: inset 0 0 0 2px var(--accent); }
+                     to { box-shadow: inset 0 0 0 2px transparent; } }
+  @media (prefers-reduced-motion: reduce) { .dev.flash, .live-dot { animation: none; } }
+  .dev-top { display: flex; justify-content: space-between; align-items: center; gap: 6px; }
+  .dev-name { font-weight: 650; }
+  .dev-meta { color: var(--ink-2); font-size: 12px; }
+  .dev-val { font-size: 18px; font-weight: 600; margin: 4px 0 2px; font-variant-numeric: tabular-nums; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; background: var(--good); }
+  .dot.down { background: var(--bad); }
+  .door-unlocked { color: var(--bad); } .door-locked { color: var(--good); }
+  .dev-actions { display: flex; gap: 4px; margin-top: 6px; flex-wrap: wrap; }
+  .attack { display: flex; gap: 12px; align-items: center; justify-content: space-between;
+            padding: 8px 0; border-bottom: 1px solid var(--line); }
+  .attack:last-child { border-bottom: 0; }
+  .attack-name { font-weight: 600; }
+  .attack-desc { color: var(--ink-2); font-size: 12px; }
+  .attack-last { font-size: 12px; margin-top: 2px; }
+  .running { color: var(--accent); font-weight: 600; text-transform: none; letter-spacing: 0; }
+  .out { display: inline-block; padding: 1px 8px; border-radius: 4px; font-size: 12px; font-weight: 650; }
+  .out-SUCCEEDED { color: var(--bad); background: var(--bad-bg); }
+  .out-BLOCKED { color: var(--good); background: var(--good-bg); }
+  .out-PARTIAL { color: var(--warn); background: var(--warn-bg); }
+  .out-ERROR { color: var(--ink-2); background: var(--soft); border: 1px dashed var(--ink-2); }
+  .scroll { max-height: 360px; overflow: auto; }
+  table { border-collapse: collapse; width: 100%; }
+  th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { color: var(--ink-2); font-weight: 600; font-size: 12px; position: sticky; top: 0; background: var(--card); }
+  td.mono { font-family: ui-monospace, Consolas, monospace; font-size: 12px; word-break: break-all; }
+  td.nowrap { white-space: nowrap; }
+  .ba th.before { color: var(--bad); } .ba th.after { color: var(--good); }
+  .ba td:first-child { font-weight: 600; white-space: nowrap; }
+  .ba td:nth-child(2), .ba td:nth-child(3) { white-space: nowrap; }
+  .v-accepted { color: var(--good); font-weight: 600; } .v-rejected { color: var(--bad); font-weight: 600; }
+  .muted { color: var(--ink-2); }
+  .ev { padding: 4px 0; border-bottom: 1px solid var(--line); font-size: 13px; }
+  .note { color: var(--ink-2); font-size: 12px; margin: 8px 0 0; }
+  .row-actions { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 10px; }
+  #toast { min-height: 20px; font-size: 13px; color: var(--ink-2); margin-top: 8px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>SecureIoT-Sim · Control Panel</h1>
+  <div class="head-right">
+    <span class="badge"><span id="live-dot" class="live-dot"></span> <span id="live-text">live</span></span>
+    <span class="seg" role="group" aria-label="Building mode">
+      <button id="to-insecure" type="button" title="Restart the building with NO security">Insecure · before</button>
+      <button id="to-secure" type="button" title="Restart the building with all defences on">Secure · after</button>
+    </span>
+    <span id="uptime" class="badge"></span>
+    <button id="pause" class="btn-ghost" type="button">Pause traffic</button>
+    <button id="stop" class="btn-danger" type="button">Stop simulation</button>
+    <button id="theme" class="btn-ghost" type="button">Dark mode</button>
+    <a id="dash-link" class="btn-link" href="#" target="secureteam-dashboard" rel="noopener">Cloud dashboard ↗</a>
+  </div>
+</header>
+<div id="busybar"></div>
+<div id="stopped">
+  <b>The simulation has stopped.</b> The broker, cloud and devices are shut down.
+  Start it again in the terminal with <code id="restart-cmd"></code>, then reload this page.
+</div>
+
+<main>
+  <section class="full tiles">
+    <div class="tile"><div class="num" id="t-cloud">0</div><div class="lbl">readings stored by the cloud</div></div>
+    <div class="tile"><div class="num" id="t-acc">0</div><div class="lbl">frames accepted by the gateway</div></div>
+    <div class="tile"><div class="num" id="t-rej">0</div><div class="lbl">frames rejected by the gateway</div></div>
+    <div class="tile"><div class="num" id="t-alerts">0</div><div class="lbl" id="t-alerts-lbl">security alerts</div></div>
+  </section>
+
+  <section class="card">
+    <h2>Building · 8 devices (live)</h2>
+    <div class="devices" id="devices"></div>
+    <p class="note" id="dev-note"></p>
+  </section>
+
+  <section class="card">
+    <h2>Attack lab <span id="attack-status" class="running"></span></h2>
+    <div id="attacks"></div>
+    <div style="margin-top:10px"><button id="run-all" type="button">Run all 8 attacks</button></div>
+    <div id="toast"></div>
+  </section>
+
+  <section class="card full">
+    <h2>Before vs after · the same attacks against both versions of the building</h2>
+    <div class="row-actions">
+      <button id="compare" type="button">Run full before/after comparison</button>
+      <span class="muted">Runs all 8 attacks on the insecure building, switches to secure, runs them again (~1 minute).</span>
+    </div>
+    <div style="overflow-x:auto"><table class="ba">
+      <thead><tr><th>Attack</th><th class="before">Before · insecure</th><th class="after">After · secure</th><th>What stopped it (secure)</th></tr></thead>
+      <tbody id="ba"></tbody></table></div>
+    <p class="note">Every cell is the newest measured result from this session. You can also fill it by hand: run attacks, flip the switch at the top, run them again.</p>
+  </section>
+
+  <section class="card full">
+    <h2>Gateway traffic · every frame, as it crossed the broker</h2>
+    <div class="scroll"><table>
+      <thead><tr><th>Time</th><th>From</th><th>Topic</th><th>Verdict</th><th>Payload on the wire / reason</th></tr></thead>
+      <tbody id="feed"></tbody></table></div>
+    <p class="note" id="feed-note"></p>
+  </section>
+
+  <section class="card">
+    <h2>Attack results (measured)</h2>
+    <div class="scroll"><table>
+      <thead><tr><th>Time</th><th>Mode</th><th>Attack</th><th>Result</th><th>Success</th><th>Defence observed</th></tr></thead>
+      <tbody id="results"></tbody></table></div>
+    <p class="note">Counted from what actually happened to the running system, nothing is typed in.</p>
+  </section>
+
+  <section class="card">
+    <h2 id="side-title">Alerts</h2>
+    <div class="scroll" id="side"></div>
+  </section>
+</main>
+
+<script>
+  let SECURE = "{{ mode }}" === "secure";
+  let mode = "{{ mode }}";
+  const $ = (id) => document.getElementById(id);
+  const lastSent = {};
+  let paused = false;
+  let stopped = false;
+  let dashboardUrl = "#";
+
+  // ---------------------------------------------------------------- helpers
+  function el(tag, text, cls) {
+    const node = document.createElement(tag);
+    if (text !== undefined && text !== null) node.textContent = text;   // never innerHTML
+    if (cls) node.className = cls;
+    return node;
+  }
+  function row(cells) {
+    const tr = document.createElement("tr");
+    for (const c of cells) tr.appendChild(c);
+    return tr;
+  }
+  function outcomeCell(outcome, text) {
+    const td = el("td");
+    td.append(el("span", outcome, "out out-" + outcome));
+    if (text) td.append(document.createTextNode(" " + text));
+    return td;
+  }
+  const time = (t) => new Date(t * 1000).toLocaleTimeString();
+  function pretty(name) {                   // "flooding_api" -> "Flooding API"
+    const text = name.replace(/_/g, " ").replace(/\bapi\b/, "API");
+    return text.charAt(0).toUpperCase() + text.slice(1);
+  }
+
+  // ---------------------------------------------------------------- theme
+  function currentTheme() {
+    const set = document.documentElement.getAttribute("data-theme");
+    if (set) return set;
+    return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+  }
+  function updateThemeUi() {
+    $("theme").textContent = currentTheme() === "dark" ? "☀ Light mode" : "☾ Dark mode";
+    $("dash-link").href = dashboardUrl === "#" ? "#" : dashboardUrl + "?theme=" + currentTheme();
+  }
+  $("theme").addEventListener("click", () => {
+    const next = currentTheme() === "dark" ? "light" : "dark";
+    document.documentElement.setAttribute("data-theme", next);
+    try { localStorage.setItem("secureteam-theme", next); } catch (e) { /* storage blocked: still works */ }
+    try { history.replaceState(null, "", location.pathname); } catch (e) { /* drop ?theme= */ }
+    updateThemeUi();
+  });
+
+  // ---------------------------------------------------------------- actions
+  async function post(url) {
+    try {
+      const res = await fetch(url, { method: "POST", headers: { "X-Panel-Request": "1" } });
+      const body = await res.json().catch(() => ({}));
+      $("toast").textContent = body.message || ("HTTP " + res.status);
+    } catch (e) {
+      $("toast").textContent = "could not reach the simulation";
+    }
+    refresh();
+  }
+
+  // ---------------------------------------------------------------- render
+  function describe(d) {
+    const r = d.reading;
+    if (!r) return "–";
+    if (d.device_type === "temperature") return r.temperature_c + " °C";
+    if (d.device_type === "energy") return Math.round(r.power_w) + " W";
+    if (d.device_type === "motion") return r.motion ? "motion · " + r.occupancy + " people" : "no motion";
+    if (d.device_type === "door_lock") return (d.state || r.state).toUpperCase();
+    return JSON.stringify(r);
+  }
+
+  function renderDevices(devices, busy) {
+    const box = $("devices"); box.replaceChildren();
+    for (const d of devices) {
+      const card = el("div", null, "dev");
+      if (lastSent[d.device_id] !== undefined && lastSent[d.device_id] !== d.sent) card.classList.add("flash");
+      lastSent[d.device_id] = d.sent;
+      const top = el("div", null, "dev-top");
+      top.append(el("span", d.device_id, "dev-name"));
+      const status = el("span", null, "dev-meta");
+      status.append(el("span", null, "dot" + (d.online ? "" : " down")),
+                    document.createTextNode(" " + (d.online ? "online" : "offline")));
+      top.append(status);
+      const val = el("div", describe(d), "dev-val");
+      if (d.device_type === "door_lock") val.classList.add("door-" + (d.state || "locked"));
+      let meta = d.device_type + " · " + d.location + " · " + d.sent + " sent";
+      if (SECURE) meta += " · key v" + d.key_version + (d.status !== "active" ? " · " + d.status.toUpperCase() : "");
+      card.append(top, val, el("div", meta, "dev-meta"));
+      if (SECURE) {
+        const actions = el("div", null, "dev-actions");
+        for (const [action, label] of [["rotate", "rotate key"], ["revoke", "revoke"], ["restore", "restore"]]) {
+          const b = el("button", label, "small"); b.type = "button";
+          if ((action === "revoke" || action === "rotate") && d.status !== "active") b.disabled = true;
+          if (action === "restore" && d.status === "active" && d.online) b.disabled = true;
+          if (busy) b.disabled = true;
+          b.addEventListener("click", () => post("/api/device/" + d.device_id + "/" + action));
+          actions.append(b);
+        }
+        card.append(actions);
+      }
+      box.append(card);
+    }
+    $("dev-note").textContent = SECURE
+      ? "Each device sends an encrypted, signed reading every few seconds. Rotate a key and the device keeps working; revoke it and the gateway refuses it."
+      : "Each device sends a plain-text reading every few seconds. Nobody checks who is sending.";
+  }
+
+  function renderAttacks(state, busy) {
+    const box = $("attacks"); box.replaceChildren();
+    const latest = {};
+    for (const r of state.results) if (r.mode === state.mode && !latest[r.attack]) latest[r.attack] = r;
+    for (const a of state.attacks) {
+      const line = el("div", null, "attack");
+      const info = el("div");
+      info.append(el("div", pretty(a.name), "attack-name"), el("div", a.description, "attack-desc"));
+      const last = latest[a.name];
+      if (state.current_attack === a.name) {
+        info.append(el("div", "running against the " + state.mode + " building…", "attack-last running"));
+      } else if (last) {
+        const l = el("div", null, "attack-last");
+        l.append(el("span", last.outcome, "out out-" + last.outcome),
+                 document.createTextNode(" " + last.success_rate_pct + "% succeeded in " + state.mode + " mode"));
+        info.append(l);
+      }
+      const b = el("button", "Run", ""); b.type = "button"; b.disabled = busy;
+      b.addEventListener("click", () => post("/api/attack/" + a.name));
+      line.append(info, b); box.append(line);
+    }
+    $("run-all").disabled = busy;
+    $("attack-status").textContent = state.current_attack
+      ? "· running " + pretty(state.current_attack) + " (normal traffic paused)" : "";
+  }
+
+  function renderBeforeAfter(rows) {
+    const body = $("ba"); body.replaceChildren();
+    for (const r of rows) {
+      const cells = [el("td", pretty(r.attack))];
+      for (const side of [r.before, r.after]) {
+        cells.push(side ? outcomeCell(side.outcome, side.successes + "/" + side.attempts + " (" + side.rate + "%)")
+                        : el("td", "not run yet", "muted"));
+      }
+      cells.push(el("td", r.after ? r.after.defence : "–", "muted"));
+      body.append(row(cells));
+    }
+  }
+
+  function renderFeed(feed) {
+    const body = $("feed"); body.replaceChildren();
+    for (const f of feed) {
+      body.append(row([el("td", time(f.at), "muted nowrap"), el("td", f.sender, "nowrap"),
+                       el("td", f.topic, "mono"), el("td", f.verdict, "v-" + f.verdict),
+                       el("td", f.detail, "mono")]));
+    }
+    $("feed-note").textContent = SECURE
+      ? "Secure mode: payloads are AES-256-GCM ciphertext ('ct') with an HMAC ('mac'), so nobody on the network can read them. Rejected frames show why the gateway refused them."
+      : "Insecure mode: payloads are plain JSON, so anyone on the network can read and change them, and nothing is ever rejected.";
+  }
+
+  function renderResults(results) {
+    const body = $("results"); body.replaceChildren();
+    if (!results.length) {
+      const td = el("td", "No attacks run yet. Press Run in the attack lab.", "muted"); td.colSpan = 6;
+      body.append(row([td]));
+    }
+    for (const r of results) {
+      body.append(row([el("td", time(r.started), "muted nowrap"), el("td", r.mode, "nowrap"),
+                       el("td", pretty(r.attack)), outcomeCell(r.outcome, ""),
+                       el("td", r.successes + "/" + r.attempts + " (" + r.success_rate_pct + "%)", "nowrap"),
+                       el("td", r.observed_defence || r.evidence, "muted")]));
+    }
+  }
+
+  function renderSide(state) {
+    const box = $("side"); box.replaceChildren();
+    if (SECURE) {
+      $("side-title").textContent = "Security alerts (also on the dashboard for admin)";
+      if (!state.alerts.length) box.append(el("div", "No alerts yet.", "muted"));
+      for (const a of state.alerts) {
+        const ev = el("div", null, "ev");
+        ev.append(el("b", a.rule), el("div", time(a.at) + " · " + a.detail, "muted"));
+        box.append(ev);
+      }
+    } else {
+      $("side-title").textContent = "Activity (no alerting exists in insecure mode)";
+      for (const e of state.events) box.append(el("div", time(e.at) + " · " + e.text, "ev"));
+    }
+  }
+
+  function render(state) {
+    mode = state.mode; SECURE = mode === "secure";
+    const busy = !!state.busy;
+    $("to-insecure").className = mode === "insecure" ? "on-insecure" : "";
+    $("to-secure").className = mode === "secure" ? "on-secure" : "";
+    $("to-insecure").disabled = busy || mode === "insecure";
+    $("to-secure").disabled = busy || mode === "secure";
+    $("compare").disabled = busy;
+    $("busybar").style.display = busy ? "block" : "none";
+    $("busybar").textContent = busy ? "Working: " + state.busy + " …" : "";
+    $("uptime").textContent = "running " + Math.floor(state.uptime / 60) + "m " + (state.uptime % 60) + "s";
+    dashboardUrl = state.dashboard_url; updateThemeUi();
+    paused = state.paused;
+    $("pause").textContent = paused ? "Resume traffic" : "Pause traffic";
+    $("t-cloud").textContent = state.cloud_received;
+    $("t-acc").textContent = state.broker.accepted;
+    $("t-rej").textContent = state.broker.rejected;
+    $("t-alerts").textContent = SECURE ? state.alerts.length + (state.alerts.length >= 8 ? "+" : "") : "none";
+    $("t-alerts-lbl").textContent = SECURE ? "security alerts (latest)" : "alerting does not exist";
+    renderDevices(state.devices, busy); renderAttacks(state, busy); renderBeforeAfter(state.before_after);
+    renderFeed(state.feed); renderResults(state.results); renderSide(state);
+  }
+
+  async function refresh() {
+    if (stopped) return;
+    try {
+      const res = await fetch("/api/state");
+      if (!res.ok) throw new Error("HTTP " + res.status);
+      render(await res.json());
+      $("live-dot").classList.toggle("off", paused);
+      $("live-text").textContent = paused ? "paused" : "live";
+    } catch (e) {
+      $("live-dot").classList.add("off"); $("live-text").textContent = "simulation stopped";
+    }
+  }
+
+  function showStopped() {
+    stopped = true;
+    $("restart-cmd").textContent = "python main.py --mode " + mode + " --live";
+    $("stopped").style.display = "block"; $("busybar").style.display = "none";
+    $("live-dot").classList.add("off"); $("live-text").textContent = "simulation stopped";
+    for (const b of document.querySelectorAll("button")) if (b.id !== "theme") b.disabled = true;
+  }
+
+  $("run-all").addEventListener("click", () => post("/api/attack/all"));
+  $("compare").addEventListener("click", () => post("/api/compare"));
+  $("to-insecure").addEventListener("click", () => post("/api/mode/insecure"));
+  $("to-secure").addEventListener("click", () => post("/api/mode/secure"));
+  $("pause").addEventListener("click", () => post("/api/traffic/" + (paused ? "resume" : "pause")));
+  $("stop").addEventListener("click", async () => {
+    if (!confirm("Stop the whole simulation? The broker, cloud, dashboard and devices will shut down.")) return;
+    try {
+      await fetch("/api/stop", { method: "POST", headers: { "X-Panel-Request": "1" } });
+    } catch (e) { /* already stopping */ }
+    showStopped();
+  });
+  updateThemeUi();
+  refresh();
+  setInterval(refresh, 1000);
+</script>
+</body>
+</html>

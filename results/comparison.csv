@@ -1,0 +1,9 @@
+attack,before_attempts,before_successes,before_rate_pct,before_outcome,after_attempts,after_successes,after_rate_pct,after_outcome,reduction_pct_points,after_observed_defence
+sniffing,20,20,100.0,SUCCEEDED,20,0,0.0,BLOCKED,100.0,payload unreadable on the wire (encrypted)
+tampering,10,10,100.0,SUCCEEDED,10,0,0.0,BLOCKED,100.0,HMAC check failed (message modified)
+replay,5,5,100.0,SUCCEEDED,5,0,0.0,BLOCKED,100.0,replayed message (old sequence number)
+spoofing,10,10,100.0,SUCCEEDED,10,0,0.0,BLOCKED,100.0,challenge-response failed (wrong key); not authenticated
+brute_force,59,1,100.0,SUCCEEDED,99,0,0.0,BLOCKED,100.0,"login refused: HTTP 401 x5, HTTP 423 x5, HTTP 429 x89"
+flooding_broker,1000,1000,100.0,SUCCEEDED,1000,20,2.0,PARTIAL,98.0,rate limit exceeded
+flooding_api,300,300,100.0,SUCCEEDED,300,36,12.0,PARTIAL,88.0,refused: HTTP 429 x264
+unauthorised_command,4,4,100.0,SUCCEEDED,4,0,0.0,BLOCKED,100.0,viewer token -> HTTP 403; no token -> HTTP 401; forged admin JWT -> HTTP 401; direct broker publish -> hello refused; broker: unknown or revoked device 'viewer1-laptop'; not authenticated

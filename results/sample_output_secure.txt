@@ -1,0 +1,179 @@
+
+======================================================================
+ SecureIoT-Sim  |  mode = SECURE
+======================================================================
+  running cipher benchmark (AES-256-GCM vs ChaCha20-Poly1305)...
+  cipher               payload      MB/s    us/op  wire bytes
+  AES-256-GCM               64     50.98     1.26          92
+  AES-256-GCM              256    190.51     1.34         284
+  AES-256-GCM             1024    624.85     1.64        1052
+  AES-256-GCM             4096   1527.82     2.68        4124
+  AES-256-GCM            16384    2363.3     6.93       16412
+  AES-256-GCM            65536   2881.77    22.74       65564
+  ChaCha20-Poly1305         64     41.62     1.54          92
+  ChaCha20-Poly1305        256    139.34     1.84         284
+  ChaCha20-Poly1305       1024    417.46     2.45        1052
+  ChaCha20-Poly1305       4096     790.5     5.18        4124
+  ChaCha20-Poly1305      16384    1017.1    16.11       16412
+  ChaCha20-Poly1305      65536   1147.44    57.11       65564
+  saved: cipher_benchmark.csv, cipher_benchmark.png
+21:46:28 [broker] SecureBroker listening on 127.0.0.1:18830
+21:46:28 [webserver] cloud API listening on http://127.0.0.1:5000
+21:46:28 [simulation] 8/8 devices online (secure mode)
+  broker  : 127.0.0.1:18830
+  cloud   : http://127.0.0.1:5000
+  devices : 8/8 online
+
+======================================================================
+ Normal operation: 5 rounds of readings
+======================================================================
+  devices sent 40 readings, cloud stored 40
+  could not read API (status 401): {'error': 'missing bearer token'}
+
+======================================================================
+ Door lock control through the cloud API
+======================================================================
+  login as operator1      -> HTTP 200, token=eyJhbGciOiJIUzI1NiIsInR5cCI6Ik...
+21:46:29 [device] lock-01 is now UNLOCKED (command from cloud)
+21:46:29 [cloud-bridge] command 'unlock' sent to lock-01 (issued by operator1)
+  command unlock  lock-01 -> HTTP 200, lock-01 is now UNLOCKED
+21:46:29 [device] lock-01 is now LOCKED (command from cloud)
+21:46:29 [cloud-bridge] command 'lock' sent to lock-01 (issued by operator1)
+  command lock    lock-01 -> HTTP 200, lock-01 is now LOCKED
+
+======================================================================
+ Module 2: cryptography and key management
+======================================================================
+  on the wire: {"hdr": {"from": "temp-01", "dev": "temp-01", "seq": 6, "ts": 1795277790.036, "kv": 1, "nonce": "AzA9q4qeiXKc+vTG"}, "ct": "gC2AuLT4sp2jEMbnmyumWIrmtL...
+  (285 bytes; reading is inside 'ct', AES-256-GCM; 'mac' is HMAC-SHA256)
+  keystore.enc: 2783 bytes, 9 device keys inside, key bytes visible in file: none
+  keystore decrypts and passes its AES-GCM integrity check: yes
+  temp-01 key rotated v1 -> v2; reading sent with v2 stored by cloud: yes
+  motion-02 revoked -> still connected: no
+  motion-02 tries to reconnect -> refused (device 'motion-02' is revoked in the registry)
+  revocation list: ['motion-02']
+21:46:30 [audit] ALERT Device authentication failed (spoofing?) - unknown: device 'motion-02' is revoked in the registry
+  replacement motion-02 registered with key v2: connected=yes, reading stored=yes
+
+======================================================================
+ Module 3: access control and privacy
+======================================================================
+  operator1 stored as: $2b$12$/CKktUxd8rUbI06uGG1aD....  (bcrypt, cost 12, salt inside)
+  same password hashed twice -> different hashes: True; both verify: True; 211 ms per hash
+  weak password for new account -> refused: weak password - needs at least 12 characters, an uppercase letter, a symbol, not a common password
+  contractor1 registered -> login HTTP 200; revoked -> login HTTP 403 (account disabled)
+  permission          viewer  operator     admin
+  read_readings          yes       yes       yes
+  send_command             -       yes       yes
+  manage_devices           -         -       yes
+  manage_users             -         -       yes
+  view_audit               -         -       yes
+21:46:32 [audit] ALERT Topic ACL violation - temp-01: topic ACL: temp-01 may not publish to 'building/floor2/temperature/temp-02'
+  temp-01 publishes on temp-02's topic -> topic ACL: temp-01 may not publish to 'building/floor2/temperature/temp-02'
+  temp-01 subscribes to 'building/#'  -> topic ACL: temp-01 may not subscribe to 'building/#'
+  pseudonymisation : dictionary attack re-identifies 8/8 unkeyed SHA-256 ids vs 0/8 keyed HMAC pseudonyms
+  aggregation      : 96 -> 24 points, peak 2813 -> 2331 W, total 28.98 = 28.98 kWh (kept)
+  diff. privacy    : epsilon=0.5, mean error 1.67 people/room, total 52 -> 56
+  k-anonymity      : k 1 -> 3, unique records 74/80 -> 0, 24 suppressed
+  saved: privacy_before_after.png, analytics_export.csv (real readings, pseudonymised)
+
+======================================================================
+ Module 4: cloud security
+======================================================================
+  admin JWT: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ...  (236 chars, 3 parts: header.claims.signature)
+  claims: sub=admin, role=admin, valid for 900 s, jti=8eddda831f2e60dc  (HS256-signed)
+21:46:33 [audit] ALERT Invalid or forged access token - 127.0.0.1: InvalidSignatureError
+21:46:33 [audit] ALERT Privilege escalation attempt (RBAC) - viewer1: viewer tried GET /api/audit
+  no token                       -> HTTP 401
+  viewer token edited to 'admin' -> HTTP 401 (signature no longer matches)
+  real viewer token on /api/audit -> HTTP 403 (role 'viewer' lacks permission 'view_audit')
+  command with SQL-injection id + bad command -> HTTP 400: ["device_id: format like 'lock-01'", "command: one of ['lock', 'unlock']"]
+  readings?limit=999999                        -> HTTP 400: ['limit: whole number 1-200']
+  6 KB login body                              -> HTTP 413: request body too large
+  in SQLite file: operator1 email = enc:v1:L3ELPPU72E7Xckk8njH9FwCcZL5SYbx...
+  in SQLite file: lock-01 reading = enc:v1:oBPWcWxDUCpBM1rnf3kpqYiJIZBgduh...
+  in SQLite file: temp-01 reading = {"device_id": "temp-01", "device_type": "temperature", "temp... (not sensitive, plain)
+  through API as admin: operator1 email = operator1@building.local
+  dashboard: http://127.0.0.1:5000/dashboard  (run with --serve to keep it open)
+
+======================================================================
+ Module 1: running every attack against SECURE mode
+======================================================================
+21:46:33 [attacks] running attack: sniffing
+21:46:33 [attacker-mitm] MITM relay listening on 127.0.0.1:18840 -> broker 18830
+21:46:34 [attacks]   -> BLOCKED (0.0%)
+21:46:35 [attacks] running attack: tampering
+21:46:35 [attacker-mitm] MITM relay listening on 127.0.0.1:18840 -> broker 18830
+21:46:35 [audit] ALERT Modified message detected (tampering) - temp-01: HMAC check failed (message modified)
+21:46:36 [attacks]   -> BLOCKED (0.0%)
+21:46:36 [attacks] running attack: replay
+21:46:36 [attacker-mitm] MITM relay listening on 127.0.0.1:18840 -> broker 18830
+21:46:36 [device] lock-01 is now UNLOCKED (command from cloud)
+21:46:36 [cloud-bridge] command 'unlock' sent to lock-01 (issued by operator1)
+21:46:36 [device] lock-01 is now LOCKED (command from cloud)
+21:46:36 [cloud-bridge] command 'lock' sent to lock-01 (issued by operator1)
+21:46:38 [audit] ALERT Replayed message detected - cloud: replayed message (old sequence number)
+21:46:39 [device] lock-01 is now LOCKED (command from cloud)
+21:46:39 [cloud-bridge] command 'lock' sent to lock-01 (issued by system)
+21:46:40 [attacks]   -> BLOCKED (0.0%)
+21:46:40 [attacks] running attack: spoofing
+21:46:40 [audit] ALERT Device authentication failed (spoofing?) - temp-01: challenge-response failed (wrong key)
+21:46:41 [attacks]   -> BLOCKED (0.0%)
+21:46:41 [attacks] running attack: brute_force
+21:46:42 [audit] ALERT Possible password brute force - operator1: invalid username or password
+21:46:42 [audit] ALERT Account locked after failed logins - operator1: account locked after too many failed attempts
+21:46:43 [audit] ALERT API flood - client rate limited - operator1: login
+21:46:45 [attacks]   -> BLOCKED (0.0%)
+21:46:45 [attacks] running attack: flooding_broker
+21:46:45 [audit] ALERT Device flooding the gateway - energy-02: rate limit exceeded
+21:46:46 [attacks]   -> PARTIAL (2.0%)
+21:46:46 [attacks] running attack: flooding_api
+21:46:47 [audit] ALERT API flood - client rate limited - viewer1: /api/readings
+21:46:50 [attacks]   -> PARTIAL (12.3%)
+21:46:50 [attacks] running attack: unauthorised_command
+21:46:52 [audit] ALERT Device authentication failed (spoofing?) - viewer1-laptop: unknown or revoked device 'viewer1-laptop'
+21:46:52 [device] lock-02 is now LOCKED (command from cloud)
+21:46:52 [cloud-bridge] command 'lock' sent to lock-02 (issued by system)
+21:46:52 [attacks]   -> BLOCKED (0.0%)
+
+======================================================================
+ Attack results (SECURE)  ->  results/after.csv
+======================================================================
+  attack                 attempts  success  rate %  outcome
+  sniffing                     20        0     0.0  BLOCKED
+  tampering                    10        0     0.0  BLOCKED
+  replay                        5        0     0.0  BLOCKED
+  spoofing                     10        0     0.0  BLOCKED
+  brute_force                  99        0     0.0  BLOCKED
+  flooding_broker            1000       20     2.0  PARTIAL
+  flooding_api                300       37    12.3  PARTIAL
+  unauthorised_command          4        0     0.0  BLOCKED
+
+  [sniffing] captured 20 frames; none readable. sample: {"payload":{"ct":"IAD7ORbhZy5XQeEG3bokz/veRv5Whe/JunhbdJaEAwh4XZzxj9EL/ZXNgpKbXquJPk0J30Di...
+  [tampering] relay modified 10 frames; cloud stored 0 temp-01 readings, 0 of them = 85.0 C
+  [replay] replayed captured unlock frame 5x; door unlocked 0x; lock rejected 0 commands in total
+  [spoofing] hello as temp-01 REFUSED; sent 10 fake readings, cloud stored 0
+  [brute_force] 99 guesses, no token (HTTP 401 x5, HTTP 423 x5, HTTP 429 x89)
+  [flooding_broker] 1000 msgs sent in 0.21s, cloud stored 20; honest temp-02: 10/10 readings arrived
+  [flooding_api] 300 requests in 3.58s: HTTP 200 x37, HTTP 429 x263
+  [unauthorised_command] viewer token: refused (HTTP 403); no token: refused (HTTP 401); forged admin JWT: refused (HTTP 401); direct broker publish: refused (hello refused)
+
+======================================================================
+ Module 4: audit log and alerts raised during the attacks
+======================================================================
+  audit log: 398 entries; most common events: rate_limited x352, login_ok x6, device_auth_failed x5, account_locked x5, login_failed x5, user_registered x4
+  alerts raised: 13
+    3 x Device authentication failed (spoofing?)   e.g. viewer1-laptop: unknown or revoked device 'viewer1-laptop' (1 event(s)
+    2 x API flood - client rate limited            e.g. viewer1: /api/readings (10 event(s) in 10s)
+    1 x Device flooding the gateway                e.g. energy-02: rate limit exceeded (1 event(s) in 10s)
+    1 x Account locked after failed logins         e.g. operator1: account locked after too many failed attempts (1 event(s) i
+    1 x Possible password brute force              e.g. operator1: invalid username or password (5 event(s) in 60s)
+    1 x Replayed message detected                  e.g. cloud: replayed message (old sequence number) (1 event(s) in 60s)
+    1 x Modified message detected (tampering)      e.g. temp-01: HMAC check failed (message modified) (1 event(s) in 60s)
+    1 x Privilege escalation attempt (RBAC)        e.g. viewer1: viewer tried GET /api/audit (1 event(s) in 60s)
+    1 x Invalid or forged access token             e.g. 127.0.0.1: InvalidSignatureError (1 event(s) in 60s)
+    1 x Topic ACL violation                        e.g. temp-01: topic ACL: temp-01 may not publish to 'building/floor2/temper
+21:46:53 [webserver] cloud API stopped
+21:46:53 [broker] broker stopped
+
+Done.

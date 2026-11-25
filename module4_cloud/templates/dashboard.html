@@ -1,0 +1,312 @@
+<!doctype html>
+<!--
+  module4_cloud/templates/dashboard.html - Smart Building dashboard.
+
+  Used by BOTH modes:
+    insecure: no login, data comes from an open /api/dashboard
+    secure:   login form -> POST /api/login -> JWT kept only in memory (a JS
+              variable, not localStorage, so other scripts/pages cannot steal it
+              later) -> GET /api/dashboard with "Authorization: Bearer <JWT>".
+  All values are inserted with textContent (never innerHTML) so data coming
+  from devices can never inject HTML or scripts (XSS protection).
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Smart Building Dashboard</title>
+<script>
+  // Apply the saved light/dark choice before the page is drawn (no flash).
+  (function () {
+    var theme = null;
+    try { theme = new URLSearchParams(location.search).get("theme"); } catch (e) {}
+    if (theme !== "dark" && theme !== "light") {
+      try { theme = localStorage.getItem("secureteam-theme"); } catch (e) {}
+    }
+    if (theme === "dark" || theme === "light") document.documentElement.setAttribute("data-theme", theme);
+  })();
+</script>
+<style>
+  :root {
+    --bg: #f9f9f7; --card: #fcfcfb; --ink: #0b0b0b; --ink-2: #52514e; --line: #e4e3df;
+    --accent: #2a78d6; --good: #0a7d0a; --warn: #9a6700; --bad: #c62f2f;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #0d0d0d; --card: #1a1a19; --ink: #f0efec; --ink-2: #c3c2b7; --line: #383835;
+      --accent: #3987e5; --good: #3fbf3f; --warn: #fab219; --bad: #e66767;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #0d0d0d; --card: #1a1a19; --ink: #f0efec; --ink-2: #c3c2b7; --line: #383835;
+    --accent: #3987e5; --good: #3fbf3f; --warn: #fab219; --bad: #e66767;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink);
+         font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  header { display: flex; align-items: center; justify-content: space-between; gap: 12px;
+           padding: 14px 20px; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+  h1 { font-size: 18px; margin: 0; }
+  h2 { font-size: 14px; margin: 0 0 10px; color: var(--ink-2); font-weight: 600;
+       text-transform: uppercase; letter-spacing: .04em; }
+  main { padding: 20px; display: grid; gap: 16px; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  @media (max-width: 900px) { main { grid-template-columns: minmax(0, 1fr); } }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 16px; overflow-x: auto; min-width: 0; }
+  .scroll { max-height: 420px; overflow: auto; }
+  .live-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--good); display: inline-block;
+              animation: pulse 1.6s infinite; }
+  .live-dot.off { background: var(--ink-2); animation: none; }
+  @keyframes pulse { 50% { opacity: .25; } }
+  @media (prefers-reduced-motion: reduce) { .live-dot { animation: none; } }
+  .door { display: flex; align-items: center; justify-content: space-between; gap: 10px;
+          padding: 8px 0; border-bottom: 1px solid var(--line); }
+  .door-state { font-weight: 650; }
+  .door-unlocked { color: var(--bad); } .door-locked { color: var(--good); }
+  .door button { padding: 4px 12px; }
+  #cmd-msg { margin-top: 8px; color: var(--ink-2); min-height: 20px; }
+  .head-right { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .btn-link { display: inline-block; padding: 7px 12px; border-radius: 6px; text-decoration: none;
+              border: 1px solid var(--accent); color: var(--accent); font-weight: 600; }
+  .btn-link:hover { background: var(--accent); color: #fff; }
+  .btn-ghost { background: transparent; color: var(--accent); }
+  .wide { grid-column: 1 / -1; }
+  table { border-collapse: collapse; width: 100%; }
+  th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+  th { color: var(--ink-2); font-weight: 600; font-size: 12px; }
+  .badge { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 12px;
+           border: 1px solid var(--line); color: var(--ink-2); }
+  .mode-insecure { color: var(--bad); border-color: var(--bad); }
+  .mode-secure { color: var(--good); border-color: var(--good); }
+  .status-active { color: var(--good); } .status-revoked { color: var(--bad); }
+  .alert { padding: 8px 0; border-bottom: 1px solid var(--line); }
+  .alert b { color: var(--bad); }
+  .muted { color: var(--ink-2); }
+  form { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  input, button { font: inherit; padding: 7px 10px; border-radius: 6px; border: 1px solid var(--line);
+                  background: var(--card); color: var(--ink); }
+  button { background: var(--accent); border-color: var(--accent); color: #fff; cursor: pointer; }
+  #login-card { max-width: 520px; margin: 40px auto; }
+  #error { color: var(--bad); }
+  .hidden { display: none !important; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Smart Building Dashboard</h1>
+  <div class="head-right">
+    <span class="badge"><span id="live-dot" class="live-dot off"></span> <span id="updated">connecting…</span></span>
+    <span id="mode" class="badge"></span>
+    <span id="who" class="badge hidden"></span>
+    <button id="theme" class="btn-ghost" type="button">Dark mode</button>
+    {% if panel_url %}
+    <!-- Only shown in live mode. Opens in its own tab so this login is not lost. -->
+    <a id="panel-link" class="btn-link" href="{{ panel_url }}" data-base="{{ panel_url }}"
+       target="secureteam-panel" rel="noopener">Control panel ↗</a>
+    {% endif %}
+    <button id="logout" class="hidden" type="button">Log out</button>
+  </div>
+</header>
+
+<section id="login-card" class="card hidden">
+  <h2>Sign in</h2>
+  <form id="login-form">
+    <input id="username" placeholder="username" autocomplete="username" required>
+    <input id="password" placeholder="password" type="password" autocomplete="current-password" required>
+    <button type="submit">Sign in</button>
+  </form>
+  <p id="error"></p>
+</section>
+
+<main id="app" class="hidden">
+  <section class="card">
+    <h2>Devices</h2>
+    <table><thead><tr><th>Device</th><th>Type</th><th>Location</th><th>Status</th></tr></thead>
+      <tbody id="devices"></tbody></table>
+  </section>
+  <section class="card">
+    <h2>Latest readings (live)</h2>
+    <table><thead><tr><th>Device</th><th>Reading</th><th>Received</th></tr></thead>
+      <tbody id="readings"></tbody></table>
+  </section>
+  <section class="card">
+    <h2>Door control</h2>
+    <div id="doors"></div>
+    <div id="cmd-msg"></div>
+  </section>
+  <section class="card">
+    <h2>Alerts</h2>
+    <div id="alerts" class="scroll"></div>
+  </section>
+</main>
+
+<script>
+  const SECURE = {{ 'true' if secure else 'false' }};
+  let token = null;                       // kept in memory only
+
+  const $ = (id) => document.getElementById(id);
+
+  function cell(row, text, cls) {
+    const td = document.createElement("td");
+    td.textContent = text;                // textContent = no HTML injection
+    if (cls) td.className = cls;
+    row.appendChild(td);
+  }
+
+  function summarise(payload) {
+    return Object.entries(payload)
+      .filter(([k]) => !["device_id", "device_type", "ts"].includes(k))
+      .map(([k, v]) => k + "=" + v).join(", ");
+  }
+
+  function render(data) {
+    $("who").textContent = data.user ? data.user + " (" + data.role + ")" : "";
+    const devices = $("devices"); devices.replaceChildren();
+    for (const d of data.devices) {
+      const tr = document.createElement("tr");
+      cell(tr, d.device_id); cell(tr, d.device_type); cell(tr, d.location);
+      cell(tr, d.status, "status-" + d.status);
+      devices.appendChild(tr);
+    }
+    const readings = $("readings"); readings.replaceChildren();
+    const now = Date.now() / 1000;
+    for (const r of data.latest) {
+      const tr = document.createElement("tr");
+      cell(tr, r.device_id); cell(tr, summarise(r.payload));
+      const age = Math.max(0, Math.round(now - r.received_at));
+      cell(tr, age + " s ago", "muted");
+      readings.appendChild(tr);
+    }
+    renderDoors(data.latest);
+    const alerts = $("alerts"); alerts.replaceChildren();
+    if (!SECURE) {
+      alerts.textContent = "No alerting in insecure mode - attacks go unnoticed.";
+    } else if (data.role !== "admin") {
+      alerts.textContent = "Alerts are visible to admins only (RBAC).";
+    } else if (data.alerts.length === 0) {
+      alerts.textContent = "No alerts.";
+    }
+    for (const a of data.alerts) {
+      const div = document.createElement("div"); div.className = "alert";
+      const title = document.createElement("b"); title.textContent = a.rule;
+      const detail = document.createElement("div"); detail.className = "muted";
+      detail.textContent = new Date(a.at * 1000).toLocaleTimeString() + " - " + a.detail;
+      div.append(title, detail); alerts.appendChild(div);
+    }
+  }
+
+  function renderDoors(latest) {
+    const box = $("doors"); box.replaceChildren();
+    for (const r of latest.filter((x) => x.payload.device_type === "door_lock")) {
+      const line = document.createElement("div"); line.className = "door";
+      const label = document.createElement("div");
+      const name = document.createElement("b"); name.textContent = r.device_id + " ";
+      const state = document.createElement("span");
+      state.textContent = String(r.payload.state).toUpperCase();
+      state.className = "door-state door-" + r.payload.state;
+      label.append(name, state);
+      const buttons = document.createElement("div");
+      for (const command of ["unlock", "lock"]) {
+        const b = document.createElement("button"); b.type = "button"; b.textContent = command;
+        b.addEventListener("click", () => sendCommand(r.device_id, command));
+        buttons.append(b, document.createTextNode(" "));
+      }
+      line.append(label, buttons); box.appendChild(line);
+    }
+  }
+
+  async function sendCommand(device, command) {
+    // Goes through the real API: in secure mode the JWT, RBAC, validation and
+    // rate limit all apply, and the cloud signs the command for the lock.
+    const headers = { "Content-Type": "application/json" };
+    if (token) headers["Authorization"] = "Bearer " + token;
+    const res = await fetch("/api/command", { method: "POST", headers,
+                                              body: JSON.stringify({ device_id: device, command }) });
+    const body = await res.json().catch(() => ({}));
+    $("cmd-msg").textContent = res.ok
+      ? "'" + command + "' sent to " + device + " (HTTP " + res.status + ")"
+      : "Refused by the cloud: HTTP " + res.status + " - " + (body.error || "error");
+    setTimeout(refresh, 500);
+  }
+
+  async function modeChanged() {
+    // The control panel can restart the building in the other mode; if that
+    // happened, reload so this page matches the cloud that is now running.
+    try {
+      const res = await fetch("/api/mode");
+      if (!res.ok) return false;
+      const body = await res.json();
+      return body.mode !== (SECURE ? "secure" : "insecure");
+    } catch (e) { return false; }
+  }
+
+  async function refresh() {
+    if (await modeChanged()) { location.reload(); return; }
+    if (SECURE && !token) { $("updated").textContent = "sign in for live data"; return; }
+    const headers = token ? { "Authorization": "Bearer " + token } : {};
+    try {
+      const res = await fetch("/api/dashboard", { headers });
+      if (res.status === 401) { signOut("Session expired - please sign in again."); return; }
+      if (res.status === 429) { $("updated").textContent = "rate limited - retrying"; return; }
+      if (res.ok) {
+        render(await res.json());
+        $("live-dot").classList.remove("off");
+        $("updated").textContent = "live · updated " + new Date().toLocaleTimeString();
+      }
+    } catch (e) {                                // cloud stopped; keep last view
+      $("live-dot").classList.add("off"); $("updated").textContent = "cloud not reachable";
+    }
+  }
+
+  function signOut(message) {
+    if (token) fetch("/api/logout", { method: "POST", headers: { "Authorization": "Bearer " + token } });
+    token = null;
+    $("app").classList.add("hidden"); $("who").classList.add("hidden"); $("logout").classList.add("hidden");
+    $("login-card").classList.remove("hidden");
+    $("error").textContent = message || "";
+  }
+
+  $("login-form").addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const res = await fetch("/api/login", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username: $("username").value, password: $("password").value }),
+    });
+    const body = await res.json();
+    $("password").value = "";
+    if (!res.ok) { $("error").textContent = "Sign-in failed: " + body.error; return; }
+    token = body.token;
+    $("login-card").classList.add("hidden");
+    $("app").classList.remove("hidden"); $("who").classList.remove("hidden"); $("logout").classList.remove("hidden");
+    refresh();
+  });
+  $("logout").addEventListener("click", () => signOut("Signed out."));
+
+  $("mode").textContent = SECURE ? "SECURE mode" : "INSECURE mode - no login";
+  $("mode").classList.add(SECURE ? "mode-secure" : "mode-insecure");
+  if (SECURE) { $("login-card").classList.remove("hidden"); }
+  else { $("app").classList.remove("hidden"); }
+  // ---------------------------------------------------------------- light / dark theme
+  function currentTheme() {
+    const set = document.documentElement.getAttribute("data-theme");
+    if (set) return set;
+    return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+  }
+  function updateThemeUi() {
+    $("theme").textContent = currentTheme() === "dark" ? "☀ Light mode" : "☾ Dark mode";
+    const link = $("panel-link");                 // carry the theme over to the panel
+    if (link) link.href = link.dataset.base + "?theme=" + currentTheme();
+  }
+  $("theme").addEventListener("click", () => {
+    const next = currentTheme() === "dark" ? "light" : "dark";
+    document.documentElement.setAttribute("data-theme", next);
+    try { localStorage.setItem("secureteam-theme", next); } catch (e) { /* storage blocked: still works */ }
+    try { history.replaceState(null, "", location.pathname); } catch (e) { /* drop ?theme= */ }
+    updateThemeUi();
+  });
+  updateThemeUi();
+
+  refresh();
+  setInterval(refresh, 2000);
+</script>
+</body>
+</html>

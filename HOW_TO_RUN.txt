@@ -1,0 +1,82 @@
+secureTeam_SecureIoT-Sim - HOW TO RUN
+==============================
+Group secureTeam, class IIOT-B2: Vansh Dabas (09519051723), Sadia Mohd. Khan (12219051723),
+Abubakar Siddiqui (08019051723), Vedant Mishra (11819051723)
+
+A simulated Smart Building (8 devices, a gateway and a cloud), attacked while insecure,
+then secured and attacked again. Everything runs on 127.0.0.1 (this computer only).
+The README.md file has the full details.
+
+
+1. REQUIREMENTS
+---------------
+- Python 3.9.2 or newer (tested on 3.11 and 3.12)
+- Internet access once, to install the libraries
+- No hardware and no admin rights needed
+
+
+2. INSTALL (one time)
+---------------------
+Unzip secureTeam_SecureIoT-Sim.zip, open a terminal in the secureTeam_SecureIoT-Sim folder, then:
+
+  Windows (PowerShell or Command Prompt):
+      python -m venv venv
+      venv\Scripts\activate
+      pip install -r requirements.txt
+
+  macOS / Linux:
+      python3 -m venv venv
+      source venv/bin/activate
+      pip install -r requirements.txt
+
+If PowerShell blocks "activate", run this first in the same window:
+      Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
+
+
+3. RUN
+------
+  python main.py --mode insecure
+      Insecure baseline: shows its weaknesses, draws the attack and fault trees,
+      runs all 8 attacks (all succeed) and writes results/before.csv.   (~25 s)
+
+  python main.py --mode secure
+      Secured system: cipher benchmark, Module 2/3/4 demos, all 8 attacks again
+      (blocked or limited), writes results/after.csv and lists the alerts.   (~30 s)
+
+  python main.py --compare
+      Runs every attack against BOTH modes and writes results/comparison.csv,
+      comparison.md and before_after.png (the before/after table and graph).   (~50 s)
+
+  python main.py --mode secure --live
+      Live demo in the browser (stop with Ctrl+C or the "Stop simulation" button):
+        Control panel:   http://127.0.0.1:5050
+                         live devices, gateway traffic, attack buttons,
+                         Insecure/Secure switch, before-vs-after table
+        Cloud dashboard: http://127.0.0.1:5000/dashboard
+
+  python -m unittest discover -s tests
+      Runs the 21 unit tests.   (~5 s)
+
+
+4. TEST ACCOUNTS (dashboard sign-in in secure mode)
+---------------------------------------------------
+Made-up values for this simulation only, listed in config.py (SEED_USERS):
+  admin      sees the alerts, can open doors
+  operator1  can open doors (its weak password is on purpose, for the brute-force test)
+  viewer1    read only: pressing "unlock" is refused with HTTP 403
+
+
+5. OUTPUT FILES (folder results/)
+---------------------------------
+  before.csv, after.csv, comparison.csv, comparison.md, before_after.png
+  attack_tree.png, fault_tree.png, cipher_benchmark.png, privacy_before_after.png
+  screenshots/ and sample_output_*.txt   (sample outputs from our own runs)
+
+
+6. IF SOMETHING GOES WRONG
+--------------------------
+- "Address already in use": an earlier run is still open. Close it, or change the
+  ports in config.py (18830, 18840, 5000, 5050).
+- operator1 cannot sign in after the brute-force attack: that is the account lockout
+  working. It clears after 5 minutes or when you restart the program.
+- A Windows firewall pop-up can be cancelled: the program only listens on 127.0.0.1.

@@ -1,0 +1,111 @@
+
+======================================================================
+ SecureIoT-Sim  |  --compare: every attack against BOTH modes
+======================================================================
+21:46:58 [compare] === INSECURE mode: starting fresh building ===
+21:46:58 [broker] InsecureBroker listening on 127.0.0.1:18830
+21:46:58 [webserver] cloud API listening on http://127.0.0.1:5000
+21:46:58 [simulation] 8/8 devices online (insecure mode)
+21:46:58 [attacks] running attack: sniffing
+21:46:58 [attacker-mitm] MITM relay listening on 127.0.0.1:18840 -> broker 18830
+21:46:59 [attacks]   -> SUCCEEDED (100.0%)
+21:47:00 [attacks] running attack: tampering
+21:47:00 [attacker-mitm] MITM relay listening on 127.0.0.1:18840 -> broker 18830
+21:47:01 [attacks]   -> SUCCEEDED (100.0%)
+21:47:01 [attacks] running attack: replay
+21:47:01 [attacker-mitm] MITM relay listening on 127.0.0.1:18840 -> broker 18830
+21:47:01 [device] lock-01 is now UNLOCKED (command from cloud)
+21:47:01 [cloud-bridge] command 'unlock' sent to lock-01 (issued by operator1)
+21:47:02 [device] lock-01 is now LOCKED (command from cloud)
+21:47:02 [cloud-bridge] command 'lock' sent to lock-01 (issued by operator1)
+21:47:03 [device] lock-01 is now UNLOCKED (command from cloud)
+21:47:03 [device] lock-01 is now UNLOCKED (command from cloud)
+21:47:04 [device] lock-01 is now UNLOCKED (command from cloud)
+21:47:04 [device] lock-01 is now UNLOCKED (command from cloud)
+21:47:04 [device] lock-01 is now UNLOCKED (command from cloud)
+21:47:05 [device] lock-01 is now LOCKED (command from cloud)
+21:47:05 [cloud-bridge] command 'lock' sent to lock-01 (issued by system)
+21:47:05 [attacks]   -> SUCCEEDED (100.0%)
+21:47:05 [attacks] running attack: spoofing
+21:47:06 [attacks]   -> SUCCEEDED (100.0%)
+21:47:06 [attacks] running attack: brute_force
+21:47:07 [attacks]   -> SUCCEEDED (100.0%)
+21:47:07 [attacks] running attack: flooding_broker
+21:47:16 [attacks]   -> SUCCEEDED (100.0%)
+21:47:16 [attacks] running attack: flooding_api
+21:47:16 [attacks]   -> SUCCEEDED (100.0%)
+21:47:17 [attacks] running attack: unauthorised_command
+21:47:17 [device] lock-02 is now UNLOCKED (command from cloud)
+21:47:17 [cloud-bridge] command 'unlock' sent to lock-02 (issued by viewer1)
+21:47:17 [device] lock-02 is now UNLOCKED (command from cloud)
+21:47:17 [cloud-bridge] command 'unlock' sent to lock-02 (issued by viewer1)
+21:47:17 [device] lock-02 is now UNLOCKED (command from cloud)
+21:47:17 [cloud-bridge] command 'unlock' sent to lock-02 (issued by viewer1)
+21:47:18 [device] lock-02 is now UNLOCKED (command from viewer1-laptop)
+21:47:18 [device] lock-02 is now LOCKED (command from cloud)
+21:47:18 [cloud-bridge] command 'lock' sent to lock-02 (issued by system)
+21:47:18 [attacks]   -> SUCCEEDED (100.0%)
+21:47:19 [webserver] cloud API stopped
+21:47:19 [broker] broker stopped
+21:47:19 [compare] === SECURE mode: starting fresh building ===
+21:47:20 [broker] SecureBroker listening on 127.0.0.1:18830
+21:47:20 [webserver] cloud API listening on http://127.0.0.1:5000
+21:47:20 [simulation] 8/8 devices online (secure mode)
+21:47:20 [attacks] running attack: sniffing
+21:47:20 [attacker-mitm] MITM relay listening on 127.0.0.1:18840 -> broker 18830
+21:47:22 [attacks]   -> BLOCKED (0.0%)
+21:47:22 [attacks] running attack: tampering
+21:47:22 [attacker-mitm] MITM relay listening on 127.0.0.1:18840 -> broker 18830
+21:47:22 [audit] ALERT Modified message detected (tampering) - temp-01: HMAC check failed (message modified)
+21:47:23 [attacks]   -> BLOCKED (0.0%)
+21:47:23 [attacks] running attack: replay
+21:47:23 [attacker-mitm] MITM relay listening on 127.0.0.1:18840 -> broker 18830
+21:47:24 [device] lock-01 is now UNLOCKED (command from cloud)
+21:47:24 [cloud-bridge] command 'unlock' sent to lock-01 (issued by operator1)
+21:47:24 [device] lock-01 is now LOCKED (command from cloud)
+21:47:24 [cloud-bridge] command 'lock' sent to lock-01 (issued by operator1)
+21:47:25 [audit] ALERT Replayed message detected - cloud: replayed message (old sequence number)
+21:47:27 [device] lock-01 is now LOCKED (command from cloud)
+21:47:27 [cloud-bridge] command 'lock' sent to lock-01 (issued by system)
+21:47:27 [attacks]   -> BLOCKED (0.0%)
+21:47:27 [attacks] running attack: spoofing
+21:47:27 [audit] ALERT Device authentication failed (spoofing?) - temp-01: challenge-response failed (wrong key)
+21:47:28 [attacks]   -> BLOCKED (0.0%)
+21:47:29 [attacks] running attack: brute_force
+21:47:30 [audit] ALERT Possible password brute force - operator1: invalid username or password
+21:47:30 [audit] ALERT Account locked after failed logins - operator1: account locked after too many failed attempts
+21:47:30 [audit] ALERT API flood - client rate limited - operator1: login
+21:47:32 [attacks]   -> BLOCKED (0.0%)
+21:47:33 [attacks] running attack: flooding_broker
+21:47:33 [audit] ALERT Device flooding the gateway - energy-02: rate limit exceeded
+21:47:33 [attacks]   -> PARTIAL (2.0%)
+21:47:34 [attacks] running attack: flooding_api
+21:47:34 [audit] ALERT API flood - client rate limited - viewer1: /api/readings
+21:47:37 [attacks]   -> PARTIAL (12.3%)
+21:47:38 [attacks] running attack: unauthorised_command
+21:47:38 [audit] ALERT Privilege escalation attempt (RBAC) - viewer1: viewer tried POST /api/command
+21:47:39 [audit] ALERT Invalid or forged access token - 127.0.0.1: InvalidAlgorithmError
+21:47:39 [audit] ALERT Device authentication failed (spoofing?) - viewer1-laptop: unknown or revoked device 'viewer1-laptop'
+21:47:40 [device] lock-02 is now LOCKED (command from cloud)
+21:47:40 [cloud-bridge] command 'lock' sent to lock-02 (issued by system)
+21:47:40 [attacks]   -> BLOCKED (0.0%)
+21:47:41 [webserver] cloud API stopped
+21:47:41 [broker] broker stopped
+
+======================================================================
+ Before / after comparison
+======================================================================
+  attack                       insecure         secure  after      defence observed
+  sniffing                   20/20 100%        0/20 0%  BLOCKED    payload unreadable on the wire (encrypted)
+  tampering                  10/10 100%        0/10 0%  BLOCKED    HMAC check failed (message modified)
+  replay                       5/5 100%         0/5 0%  BLOCKED    replayed message (old sequence number)
+  spoofing                   10/10 100%        0/10 0%  BLOCKED    challenge-response failed (wrong key); not authenticated
+  brute_force                 1/59 100%        0/99 0%  BLOCKED    login refused: HTTP 401 x5, HTTP 423 x5, HTTP 429 x89
+  flooding_broker        1000/1000 100%     20/1000 2%  PARTIAL    rate limit exceeded
+  flooding_api             300/300 100%   37/300 12.3%  PARTIAL    refused: HTTP 429 x263
+  unauthorised_command         4/4 100%         0/4 0%  BLOCKED    viewer token -> HTTP 403; no token -> HTTP 401; forged admin
+
+  8 attacks: 6 blocked, 2 limited, 0 still succeed in secure mode
+  saved: results/before.csv, after.csv, comparison.csv, comparison.md, before_after.png
+         (+ attack_tree.png, fault_tree.png, cipher_benchmark.*, privacy_before_after.png, analytics_export.csv)
+  total time: 47 s

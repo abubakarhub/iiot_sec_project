@@ -1,0 +1,114 @@
+
+======================================================================
+ SecureIoT-Sim  |  mode = INSECURE
+======================================================================
+  attack/fault trees saved: attack_tree.png, fault_tree.png
+21:46:01 [broker] InsecureBroker listening on 127.0.0.1:18830
+21:46:01 [webserver] cloud API listening on http://127.0.0.1:5000
+21:46:01 [simulation] 8/8 devices online (insecure mode)
+  broker  : 127.0.0.1:18830
+  cloud   : http://127.0.0.1:5000
+  devices : 8/8 online
+
+======================================================================
+ Normal operation: 5 rounds of readings
+======================================================================
+  devices sent 40 readings, cloud stored 40
+  device      topic                                  reading
+  energy-01   building/floor1/energy/energy-01       power_w=1482.7, total_kwh=1945.667
+  energy-02   building/floor2/energy/energy-02       power_w=2368.0, total_kwh=3494.37
+  lock-01     building/floor1/door_lock/lock-01      state=locked, unlock_count=0
+  lock-02     building/floor2/door_lock/lock-02      state=locked, unlock_count=0
+  motion-01   building/floor1/motion/motion-01       motion=False, occupancy=0
+  motion-02   building/floor2/motion/motion-02       motion=True, occupancy=5
+  temp-01     building/floor1/temperature/temp-01    temperature_c=22.1
+  temp-02     building/floor2/temperature/temp-02    temperature_c=20.96
+
+======================================================================
+ Door lock control through the cloud API
+======================================================================
+  login as operator1      -> HTTP 200, token=insecure-operator1
+21:46:01 [device] lock-01 is now UNLOCKED (command from cloud)
+21:46:01 [cloud-bridge] command 'unlock' sent to lock-01 (issued by operator1)
+  command unlock  lock-01 -> HTTP 200, lock-01 is now UNLOCKED
+21:46:01 [device] lock-01 is now LOCKED (command from cloud)
+21:46:01 [cloud-bridge] command 'lock' sent to lock-01 (issued by operator1)
+  command lock    lock-01 -> HTTP 200, lock-01 is now LOCKED
+
+======================================================================
+ Baseline weaknesses visible right now
+======================================================================
+  passwords stored in plaintext in the DB : YES
+21:46:02 [device] lock-02 is now LOCKED (command from cloud)
+21:46:02 [cloud-bridge] command 'lock' sent to lock-02 (issued by anonymous)
+  /api/command works with NO token        : YES (HTTP 200)
+  readings travel as readable JSON        : YES, e.g. state=locked, unlock_count=1
+
+======================================================================
+ Module 1: running every attack against INSECURE mode
+======================================================================
+21:46:02 [attacks] running attack: sniffing
+21:46:02 [attacker-mitm] MITM relay listening on 127.0.0.1:18840 -> broker 18830
+21:46:03 [attacks]   -> SUCCEEDED (100.0%)
+21:46:03 [attacks] running attack: tampering
+21:46:03 [attacker-mitm] MITM relay listening on 127.0.0.1:18840 -> broker 18830
+21:46:05 [attacks]   -> SUCCEEDED (100.0%)
+21:46:05 [attacks] running attack: replay
+21:46:05 [attacker-mitm] MITM relay listening on 127.0.0.1:18840 -> broker 18830
+21:46:05 [device] lock-01 is now UNLOCKED (command from cloud)
+21:46:05 [cloud-bridge] command 'unlock' sent to lock-01 (issued by operator1)
+21:46:05 [device] lock-01 is now LOCKED (command from cloud)
+21:46:05 [cloud-bridge] command 'lock' sent to lock-01 (issued by operator1)
+21:46:07 [device] lock-01 is now UNLOCKED (command from cloud)
+21:46:07 [device] lock-01 is now UNLOCKED (command from cloud)
+21:46:07 [device] lock-01 is now UNLOCKED (command from cloud)
+21:46:08 [device] lock-01 is now UNLOCKED (command from cloud)
+21:46:08 [device] lock-01 is now UNLOCKED (command from cloud)
+21:46:08 [device] lock-01 is now LOCKED (command from cloud)
+21:46:08 [cloud-bridge] command 'lock' sent to lock-01 (issued by system)
+21:46:09 [attacks]   -> SUCCEEDED (100.0%)
+21:46:09 [attacks] running attack: spoofing
+21:46:10 [attacks]   -> SUCCEEDED (100.0%)
+21:46:10 [attacks] running attack: brute_force
+21:46:11 [attacks]   -> SUCCEEDED (100.0%)
+21:46:11 [attacks] running attack: flooding_broker
+21:46:19 [attacks]   -> SUCCEEDED (100.0%)
+21:46:19 [attacks] running attack: flooding_api
+21:46:20 [attacks]   -> SUCCEEDED (100.0%)
+21:46:20 [attacks] running attack: unauthorised_command
+21:46:20 [device] lock-02 is now UNLOCKED (command from cloud)
+21:46:20 [cloud-bridge] command 'unlock' sent to lock-02 (issued by viewer1)
+21:46:21 [device] lock-02 is now UNLOCKED (command from cloud)
+21:46:21 [cloud-bridge] command 'unlock' sent to lock-02 (issued by viewer1)
+21:46:21 [device] lock-02 is now UNLOCKED (command from cloud)
+21:46:21 [cloud-bridge] command 'unlock' sent to lock-02 (issued by viewer1)
+21:46:21 [device] lock-02 is now UNLOCKED (command from viewer1-laptop)
+21:46:22 [device] lock-02 is now LOCKED (command from cloud)
+21:46:22 [cloud-bridge] command 'lock' sent to lock-02 (issued by system)
+21:46:22 [attacks]   -> SUCCEEDED (100.0%)
+
+======================================================================
+ Attack results (INSECURE)  ->  results/before.csv
+======================================================================
+  attack                 attempts  success  rate %  outcome
+  sniffing                     20       20   100.0  SUCCEEDED
+  tampering                    10       10   100.0  SUCCEEDED
+  replay                        5        5   100.0  SUCCEEDED
+  spoofing                     10       10   100.0  SUCCEEDED
+  brute_force                  59        1   100.0  SUCCEEDED
+  flooding_broker            1000     1000   100.0  SUCCEEDED
+  flooding_api                300      300   100.0  SUCCEEDED
+  unauthorised_command          4        4   100.0  SUCCEEDED
+
+  [sniffing] captured 20 frames; readable example: {'temperature_c': 22.27}
+  [tampering] relay modified 10 frames; cloud stored 10 temp-01 readings, 10 of them = 85.0 C
+  [replay] replayed captured unlock frame 5x; door unlocked 5x; lock rejected 0 commands in total
+  [spoofing] hello as temp-01 ACCEPTED; sent 10 fake readings, cloud stored 10
+  [brute_force] token obtained for operator1 after 59 guesses (HTTP 200 x1, HTTP 401 x58)
+  [flooding_broker] 1000 msgs sent in 0.21s, cloud stored 1000; honest temp-02: 10/10 readings arrived
+  [flooding_api] 300 requests in 0.51s: HTTP 200 x300
+  [unauthorised_command] viewer token: UNLOCKED (HTTP 200); no token: UNLOCKED (HTTP 200); forged admin JWT: UNLOCKED (HTTP 200); direct broker publish: UNLOCKED (hello accepted)
+21:46:22 [webserver] cloud API stopped
+21:46:22 [broker] broker stopped
+
+Done.
