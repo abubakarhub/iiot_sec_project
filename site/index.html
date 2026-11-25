@@ -1,0 +1,184 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SecureIoT-Sim</title>
+<meta name="description" content="SecureIoT-Sim by secureTeam: a Python-simulated Smart Building, attacked while insecure, then secured and attacked again with measured before/after results.">
+<script>
+  (function () { var t = null; try { t = localStorage.getItem("secureteam-site-theme"); } catch (e) {}
+    if (t === "dark" || t === "light") document.documentElement.setAttribute("data-theme", t); })();
+</script>
+<style>
+  :root { --bg:#f7f8fa; --card:#ffffff; --ink:#0f1b2d; --ink-2:#4a5568; --line:#e2e8f0; --accent:#1c7293;
+          --bad:#c62f2f; --bad-bg:#fbe7e7; --good:#1f7a45; --good-bg:#e3f4ea; --warn:#9a6700; --warn-bg:#fbf1dc; }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+          --bg:#0d1117; --card:#161b22; --ink:#e6edf3; --ink-2:#9aa7b4; --line:#2a3340; --accent:#4fa8c9;
+          --bad:#ef6b6b; --bad-bg:#3a1717; --good:#4cc38a; --good-bg:#12301f; --warn:#f0b429; --warn-bg:#33280e; } }
+  :root[data-theme="dark"] { --bg:#0d1117; --card:#161b22; --ink:#e6edf3; --ink-2:#9aa7b4; --line:#2a3340; --accent:#4fa8c9;
+          --bad:#ef6b6b; --bad-bg:#3a1717; --good:#4cc38a; --good-bg:#12301f; --warn:#f0b429; --warn-bg:#33280e; }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font:16px/1.6 system-ui,-apple-system,"Segoe UI",sans-serif; }
+  a { color:var(--accent); }
+  .wrap { max-width:1100px; margin:0 auto; padding:0 16px; }
+  header.top { position:sticky; top:0; z-index:5; background:var(--bg); border-bottom:1px solid var(--line); }
+  header.top .wrap { display:flex; align-items:center; justify-content:space-between; gap:12px; padding-top:10px; padding-bottom:10px; flex-wrap:wrap; }
+  .brand { font-weight:700; }
+  nav { display:flex; gap:14px; flex-wrap:wrap; font-size:14px; align-items:center; }
+  nav a { text-decoration:none; }
+  button.theme { font:inherit; font-size:13px; padding:4px 10px; border-radius:6px; border:1px solid var(--line); background:var(--card); color:var(--ink); cursor:pointer; }
+  .hero { padding:56px 0 32px; }
+  .kicker { color:var(--accent); font-weight:600; font-size:14px; letter-spacing:.06em; text-transform:uppercase; }
+  h1 { font-size:clamp(34px,6vw,54px); line-height:1.1; margin:8px 0 12px; }
+  h2 { font-size:26px; margin:0 0 8px; }
+  h3 { margin:0 0 6px; font-size:18px; }
+  .lead { font-size:19px; color:var(--ink-2); max-width:780px; }
+  .meta { color:var(--ink-2); font-size:14px; margin-top:14px; }
+  .btns { display:flex; gap:10px; flex-wrap:wrap; margin-top:22px; }
+  .btn { display:inline-block; padding:10px 16px; border-radius:8px; text-decoration:none; font-weight:600; border:1px solid var(--accent); }
+  .btn.primary { background:var(--accent); color:#fff; }
+  section { padding:36px 0; border-top:1px solid var(--line); }
+  .sub { color:var(--ink-2); margin:0 0 20px; max-width:760px; }
+  .stats { display:grid; gap:14px; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); margin-top:28px; }
+  .stat { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:16px; }
+  .stat b { display:block; font-size:36px; line-height:1.1; }
+  .stat span { color:var(--ink-2); font-size:14px; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:18px; }
+  .grid2 { display:grid; gap:16px; grid-template-columns:repeat(auto-fit,minmax(300px,1fr)); }
+  .grid4 { display:grid; gap:16px; grid-template-columns:repeat(auto-fit,minmax(230px,1fr)); }
+  figure { margin:0; }
+  figure img { width:100%; height:auto; display:block; border-radius:10px; border:1px solid var(--line); background:#fff; }
+  figcaption { color:var(--ink-2); font-size:14px; margin-top:8px; }
+  .label { display:inline-block; font-size:12px; font-weight:700; padding:2px 8px; border-radius:4px; margin-bottom:8px; }
+  .before { color:var(--bad); background:var(--bad-bg); } .after { color:var(--good); background:var(--good-bg); }
+  table { width:100%; border-collapse:collapse; font-size:15px; }
+  th, td { text-align:left; padding:9px 10px; border-bottom:1px solid var(--line); vertical-align:top; }
+  th { color:var(--ink-2); font-size:13px; font-weight:600; }
+  .tbl { overflow-x:auto; background:var(--card); border:1px solid var(--line); border-radius:12px; }
+  .out { font-size:12px; font-weight:700; padding:1px 7px; border-radius:4px; white-space:nowrap; }
+  .o-s { color:var(--bad); background:var(--bad-bg); } .o-b { color:var(--good); background:var(--good-bg); } .o-p { color:var(--warn); background:var(--warn-bg); }
+  .owner { color:var(--accent); font-weight:600; font-size:14px; }
+  .card ul { margin:8px 0 0; padding-left:18px; color:var(--ink-2); font-size:15px; }
+  code { font-family:ui-monospace,Consolas,monospace; font-size:14px; background:var(--card); border:1px solid var(--line); padding:1px 5px; border-radius:4px; }
+  pre { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:14px; overflow-x:auto; font-size:14px; }
+  footer { padding:28px 0 40px; color:var(--ink-2); font-size:14px; border-top:1px solid var(--line); }
+</style>
+</head>
+<body>
+<header class="top"><div class="wrap">
+  <span class="brand">SecureIoT-Sim · secureTeam</span>
+  <nav>
+    <a href="#results">Results</a><a href="#architecture">Architecture</a><a href="#modules">Modules</a>
+    <a href="#screenshots">Screenshots</a><a href="#downloads">Downloads</a>
+    <button class="theme" id="theme" type="button">Theme</button>
+  </nav>
+</div></header>
+
+<main class="wrap">
+  <div class="hero">
+    <div class="kicker">IIOT Security [ARI421] · Group project</div>
+    <h1>SecureIoT-Sim</h1>
+    <p class="lead">A Smart Building simulated entirely in Python: 8 devices, a gateway and a cloud. We attacked it while it was insecure, secured it in four layers, then re-ran <b>exactly the same attack code</b> and measured the difference.</p>
+    <p class="meta">secureTeam (class IIOT-B2): Vansh Dabas · Sadia Mohd. Khan · Abubakar Siddiqui · Vedant Mishra<br>
+      Faculty: Mr. Arun Kumar · University School of Automation and Robotics, GGSIPU East Delhi Campus</p>
+    <div class="btns">
+      <a class="btn primary" href="assets/secureTeam_SecureIoT-Sim_Report.pdf">Read the report</a>
+      <a class="btn" href="https://github.com/abubakarhub/iiot_sec_project">Source code on GitHub</a>
+    </div>
+    <div class="stats">
+      <div class="stat"><b>8</b><span>real attacks</span></div>
+      <div class="stat"><b style="color:var(--bad)">100%</b><span>succeeded before</span></div>
+      <div class="stat"><b style="color:var(--good)">6</b><span>fully blocked after</span></div>
+      <div class="stat"><b style="color:var(--warn)">2</b><span>limited to 2% and ~12%</span></div>
+      <div class="stat"><b>0</b><span>still succeed</span></div>
+    </div>
+  </div>
+
+  <section id="results">
+    <h2>Before vs after</h2>
+    <p class="sub">Every number is measured from the running system (database rows, lock state, broker counters, HTTP replies). Nothing is typed in.</p>
+    <div class="tbl"><table>
+      <thead><tr><th>Attack</th><th>Insecure (before)</th><th>Secure (after)</th><th>What stopped it</th></tr></thead>
+      <tbody>
+        <tr><td>Sniffing</td><td><span class="out o-s">SUCCEEDED</span> 20/20</td><td><span class="out o-b">BLOCKED</span> 0/20</td><td>AES-256-GCM encryption</td></tr>
+        <tr><td>Tampering</td><td><span class="out o-s">SUCCEEDED</span> 10/10</td><td><span class="out o-b">BLOCKED</span> 0/10</td><td>HMAC-SHA256 integrity check</td></tr>
+        <tr><td>Replay</td><td><span class="out o-s">SUCCEEDED</span> 5/5</td><td><span class="out o-b">BLOCKED</span> 0/5</td><td>Sequence numbers + timestamp window</td></tr>
+        <tr><td>Spoofing</td><td><span class="out o-s">SUCCEEDED</span> 10/10</td><td><span class="out o-b">BLOCKED</span> 0/10</td><td>Challenge-response device authentication</td></tr>
+        <tr><td>Brute force</td><td><span class="out o-s">SUCCEEDED</span> at guess 59</td><td><span class="out o-b">BLOCKED</span> 0/99</td><td>bcrypt + lockout + login rate limit</td></tr>
+        <tr><td>Broker flood</td><td><span class="out o-s">SUCCEEDED</span> 1000/1000</td><td><span class="out o-p">PARTIAL</span> 20/1000</td><td>Token-bucket rate limit at the gateway</td></tr>
+        <tr><td>API flood</td><td><span class="out o-s">SUCCEEDED</span> 300/300</td><td><span class="out o-p">PARTIAL</span> ~12%</td><td>Per-user API rate limit (HTTP 429)</td></tr>
+        <tr><td>Unauthorised command</td><td><span class="out o-s">SUCCEEDED</span> 4/4</td><td><span class="out o-b">BLOCKED</span> 0/4</td><td>JWT + role-based access control + topic ACL</td></tr>
+      </tbody>
+    </table></div>
+    <figure style="margin-top:20px"><img src="assets/before_after.png" alt="Bar chart: attack success rate, insecure vs secure" loading="lazy">
+      <figcaption>Attack success rate: insecure (before) vs secure (after).</figcaption></figure>
+  </section>
+
+  <section id="architecture">
+    <h2>Architecture</h2>
+    <p class="sub">Devices publish to an MQTT-style gateway; the cloud stores readings in SQLite and serves a REST API and dashboard. The attacker targets both the network path and the API. Everything runs on <code>127.0.0.1</code>; the attack code refuses any other address.</p>
+    <figure><img src="assets/architecture.png" alt="Architecture diagram" loading="lazy"></figure>
+  </section>
+
+  <section id="modules">
+    <h2>Four modules, four owners</h2>
+    <div class="grid4">
+      <div class="card"><h3>1 · Threats and attacks</h3><div class="owner">Vansh Dabas</div>
+        <ul><li>Insecure baseline</li><li>Requirements, attack tree, fault tree</li><li>8 simulated attacks</li></ul></div>
+      <div class="card"><h3>2 · Cryptography</h3><div class="owner">Sadia Mohd. Khan</div>
+        <ul><li>AES-256-GCM, HMAC-SHA256</li><li>ECDSA-signed door commands</li><li>Key storage, rotation, revocation</li></ul></div>
+      <div class="card"><h3>3 · Access control and privacy</h3><div class="owner">Abubakar Siddiqui</div>
+        <ul><li>bcrypt, lockout, RBAC</li><li>Topic-level broker permissions</li><li>4 privacy techniques</li></ul></div>
+      <div class="card"><h3>4 · Cloud security and case study</h3><div class="owner">Vedant Mishra</div>
+        <ul><li>JWT, validation, rate limits</li><li>Encrypted database fields, alerts</li><li>Mirai botnet case study</li></ul></div>
+    </div>
+    <div class="grid2" style="margin-top:20px">
+      <figure><img src="assets/cipher_benchmark.png" alt="AES-256-GCM vs ChaCha20-Poly1305 benchmark" loading="lazy"><figcaption>Cipher comparison: AES-256-GCM vs ChaCha20-Poly1305.</figcaption></figure>
+      <figure><img src="assets/privacy_before_after.png" alt="Privacy techniques before and after" loading="lazy"><figcaption>Privacy: aggregation, differential privacy, k-anonymity, pseudonymisation.</figcaption></figure>
+    </div>
+  </section>
+
+  <section id="screenshots">
+    <h2>The live demo</h2>
+    <p class="sub">A control panel launches the real attacks and switches the building between insecure and secure mode.</p>
+    <div class="grid2">
+      <figure><span class="label before">BEFORE · insecure</span><img src="assets/1_before_insecure_control_panel.jpg" alt="Control panel in insecure mode, every attack succeeded" loading="lazy"><figcaption>Every attack succeeded.</figcaption></figure>
+      <figure><span class="label after">AFTER · secure</span><img src="assets/4_after_secure_control_panel.jpg" alt="Control panel in secure mode, attacks blocked" loading="lazy"><figcaption>Six blocked, two limited.</figcaption></figure>
+      <figure><span class="label before">BEFORE · insecure</span><img src="assets/2_before_insecure_plaintext_traffic.jpg" alt="Gateway traffic as readable JSON" loading="lazy"><figcaption>Traffic is readable JSON.</figcaption></figure>
+      <figure><span class="label after">AFTER · secure</span><img src="assets/5_after_secure_encrypted_traffic.jpg" alt="Gateway traffic as ciphertext" loading="lazy"><figcaption>Traffic is AES-256-GCM ciphertext.</figcaption></figure>
+      <figure><span class="label before">BEFORE · insecure</span><img src="assets/3_before_insecure_dashboard.jpg" alt="Insecure dashboard with no alerts" loading="lazy"><figcaption>No login, doors opened by attackers, no alerts.</figcaption></figure>
+      <figure><span class="label after">AFTER · secure</span><img src="assets/6_after_secure_dashboard_admin_alerts.jpg" alt="Secure dashboard with alerts" loading="lazy"><figcaption>Admin sees every attack as an alert.</figcaption></figure>
+    </div>
+    <figure style="margin-top:20px"><img src="assets/7_before_vs_after_table.jpg" alt="Before vs after table in the control panel" loading="lazy"><figcaption>The control panel's one-click before/after comparison.</figcaption></figure>
+  </section>
+
+  <section id="downloads">
+    <h2>Downloads and running it</h2>
+    <div class="grid2">
+      <div class="card"><h3>Documents</h3><ul>
+        <li><a href="assets/secureTeam_SecureIoT-Sim_Report.pdf">Project report (PDF)</a></li>
+        <li><a href="assets/secureTeam_SecureIoT-Sim_Presentation.pdf">Presentation (PDF)</a></li>
+        <li><a href="assets/case_study.pdf">Case study: the Mirai botnet (PDF)</a></li>
+        <li><a href="https://github.com/abubakarhub/iiot_sec_project">Source code (GitHub)</a></li></ul></div>
+      <div class="card"><h3>Run it locally</h3>
+        <p style="margin:6px 0;color:var(--ink-2);font-size:15px">The simulation needs a local machine (it runs a TCP broker and only talks to 127.0.0.1), so it cannot run on this website.</p>
+<pre>pip install -r requirements.txt
+python main.py --compare
+python main.py --mode secure --live</pre></div>
+    </div>
+  </section>
+</main>
+
+<footer><div class="wrap">secureTeam · SecureIoT-Sim · IIOT Security [ARI421] · Built with an AI assistant, declared in the report (Appendix B).</div></footer>
+
+<script>
+  var btn = document.getElementById("theme");
+  function current() { var t = document.documentElement.getAttribute("data-theme");
+    return t || (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light"); }
+  function label() { btn.textContent = current() === "dark" ? "☀ Light" : "☾ Dark"; }
+  btn.addEventListener("click", function () { var n = current() === "dark" ? "light" : "dark";
+    document.documentElement.setAttribute("data-theme", n); try { localStorage.setItem("secureteam-site-theme", n); } catch (e) {} label(); });
+  label();
+</script>
+</body>
+</html>
