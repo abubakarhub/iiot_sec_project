@@ -119,6 +119,14 @@ there. Inside the server everything still uses `127.0.0.1`, so the attacks only 
 the simulation. Deploy with `render.yaml`: on render.com choose **New → Blueprint**,
 pick this repository, and type a password when asked.
 
+### Vercel
+
+Vercel cannot keep a program running, so the Vercel site (`site/` + `api/run.py`)
+runs the project **on demand**: every "Run" click calls `/api/run`, which starts a
+fresh building inside the function, runs the real attack against it and returns the
+measured result, gateway traffic and alerts. Import the repository on vercel.com and
+deploy; `vercel.json` sets everything up.
+
 ## 4. Results (`results/`)
 
 | File | Content |

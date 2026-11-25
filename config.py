@@ -23,7 +23,8 @@ PANEL_PORT = 5050           # simulation control panel (live view + attack launc
 # Folders
 # ---------------------------------------------------------------------------
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-DATA_DIR = os.path.join(BASE_DIR, "data")         # runtime files, recreated each run
+# Runtime files, recreated each run. SECUREIOT_DATA_DIR overrides it (Vercel: /tmp).
+DATA_DIR = os.environ.get("SECUREIOT_DATA_DIR") or os.path.join(BASE_DIR, "data")
 RESULTS_DIR = os.path.join(BASE_DIR, "results")   # CSVs and graphs we hand in
 DOCS_DIR = os.path.join(BASE_DIR, "docs")
 

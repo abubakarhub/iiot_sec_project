@@ -68,7 +68,7 @@
 <header class="top"><div class="wrap">
   <span class="brand">SecureIoT-Sim · secureTeam</span>
   <nav>
-    <a href="#results">Results</a><a href="#architecture">Architecture</a><a href="#modules">Modules</a>
+    <a href="#lab"><b>Run it live</b></a><a href="#results">Results</a><a href="#architecture">Architecture</a><a href="#modules">Modules</a>
     <a href="#screenshots">Screenshots</a><a href="#downloads">Downloads</a>
     <button class="theme" id="theme" type="button">Theme</button>
   </nav>
@@ -93,6 +93,24 @@
       <div class="stat"><b>0</b><span>still succeed</span></div>
     </div>
   </div>
+
+  <section id="lab">
+    <h2>Run it live: the real project, right here</h2>
+    <p class="sub">Each click starts the real Smart Building on the server (gateway, 8 devices, cloud), runs the real attack code against it, and shows what was measured. Same code as <code>python main.py</code>; one run takes a few seconds.</p>
+    <div class="btns" style="margin:0 0 14px">
+      <button class="btn primary" id="lab-all" type="button">Run full before/after comparison (16 runs)</button>
+    </div>
+    <div class="tbl"><table>
+      <thead><tr><th>Attack</th><th>Insecure (before)</th><th>Secure (after)</th></tr></thead>
+      <tbody id="lab-rows"></tbody>
+    </table></div>
+    <div class="grid2" style="margin-top:16px">
+      <div class="card"><h3 id="feed-title">Gateway traffic of the last run</h3>
+        <div id="lab-feed" style="font-family:ui-monospace,Consolas,monospace;font-size:12px;word-break:break-all;color:var(--ink-2)">Run an attack to see the frames that crossed the gateway.</div></div>
+      <div class="card"><h3>What the system said</h3>
+        <div id="lab-detail" style="font-size:14px;color:var(--ink-2)">Run an attack to see the defence and evidence.</div></div>
+    </div>
+  </section>
 
   <section id="results">
     <h2>Before vs after</h2>
@@ -179,6 +197,48 @@ python main.py --mode secure --live</pre></div>
   btn.addEventListener("click", function () { var n = current() === "dark" ? "light" : "dark";
     document.documentElement.setAttribute("data-theme", n); try { localStorage.setItem("secureteam-site-theme", n); } catch (e) {} label(); });
   label();
+
+  // ---------------------------------------------------------------- live attack lab
+  var ATTACKS = [["sniffing", "Sniffing"], ["tampering", "Tampering"], ["replay", "Replay"], ["spoofing", "Spoofing"],
+    ["brute_force", "Brute force"], ["flooding_broker", "Broker flood"], ["flooding_api", "API flood"], ["unauthorised_command", "Unauthorised command"]];
+  var busy = false;
+  function el(tag, text, cls) { var n = document.createElement(tag); if (text != null) n.textContent = text; if (cls) n.className = cls; return n; }
+  function cellFor(name, mode) { return document.getElementById("c-" + name + "-" + mode); }
+  function setBusy(b) { busy = b; document.querySelectorAll("#lab button").forEach(function (x) { x.disabled = b; }); }
+  ATTACKS.forEach(function (a) {
+    var tr = el("tr"); tr.append(el("td", a[1]));
+    ["insecure", "secure"].forEach(function (mode) {
+      var td = el("td"); td.id = "c-" + a[0] + "-" + mode;
+      var b = el("button", "Run", "theme"); b.type = "button";
+      b.addEventListener("click", function () { if (!busy) { setBusy(true); runOne(a[0], mode).finally(function () { setBusy(false); }); } });
+      td.append(b); tr.append(td);
+    });
+    document.getElementById("lab-rows").append(tr);
+  });
+  async function runOne(name, mode) {
+    var td = cellFor(name, mode); td.replaceChildren(el("span", "running…", "out o-p"));
+    try {
+      var res = await fetch("/api/run?mode=" + mode + "&attack=" + name);
+      var data = await res.json();
+      if (!res.ok) throw new Error(data.error || ("HTTP " + res.status));
+      var r = data.result, cls = r.outcome === "SUCCEEDED" ? "o-s" : r.outcome === "BLOCKED" ? "o-b" : "o-p";
+      td.replaceChildren(el("span", r.outcome, "out " + cls), document.createTextNode(" " + r.successes + "/" + r.attempts + " (" + r.success_rate_pct + "%)"));
+      document.getElementById("feed-title").textContent = "Gateway traffic of the last run (" + mode + ", " + name.replace(/_/g, " ") + ")";
+      var feed = document.getElementById("lab-feed"); feed.replaceChildren();
+      data.feed.forEach(function (f) { var d = el("div", f.sender + " · " + f.verdict + " · " + f.detail); d.style.padding = "3px 0"; d.style.borderBottom = "1px solid var(--line)"; d.style.color = f.verdict === "rejected" ? "var(--bad)" : "var(--ink-2)"; feed.append(d); });
+      var det = document.getElementById("lab-detail"); det.replaceChildren(
+        el("div", "Defence observed: " + (r.observed_defence || "none - the attack was not stopped")),
+        el("div", "Evidence: " + r.evidence), el("div", "Run took " + data.seconds + " s; gateway accepted " + data.gateway.accepted + ", rejected " + data.gateway.rejected + " frames."));
+      data.alerts.forEach(function (a) { det.append(el("div", "ALERT: " + a.rule + " - " + a.detail)); });
+      det.querySelectorAll("div").forEach(function (d) { d.style.marginBottom = "6px"; });
+    } catch (e) {
+      td.replaceChildren(el("span", "error: " + e.message, "out o-s"));
+    }
+  }
+  document.getElementById("lab-all").addEventListener("click", async function () {
+    if (busy) return; setBusy(true);
+    try { for (var m of ["insecure", "secure"]) for (var a of ATTACKS) await runOne(a[0], m); } finally { setBusy(false); }
+  });
 </script>
 </body>
 </html>

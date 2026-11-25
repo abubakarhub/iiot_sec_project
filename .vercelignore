@@ -1,0 +1,9 @@
+venv
+.venv
+data
+deliverables
+__pycache__
+*.pyc
+docs/*.docx
+docs/*.pdf
+results/screenshots
